@@ -40,16 +40,17 @@ jobs:
           VITE_BASE: /SNAI/
 
       - name: Configure Pages
+        if: ${{ vars.ENABLE_GITHUB_PAGES == 'true' }}
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload artifact
+        if: ${{ vars.ENABLE_GITHUB_PAGES == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    if: ${{ vars.ENABLE_GITHUB_PAGES == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -12,6 +12,7 @@
 - Las operaciones HTTP DELETE permanecen bloqueadas con `VITE_ENABLE_DELETE=false`.
 - El repositorio no incluye `.env`, `node_modules` ni `dist`.
 - GitHub Pages está configurado para la subruta `/SNAI/` y usa router hash.
+- La compilación CI se ejecuta en cada push. El despliegue Pages queda condicionado a la variable `ENABLE_GITHUB_PAGES=true` después de habilitar Pages en la configuración del repositorio.
 - `render.yaml` configura un Static Site con publicación desde `dist` y fallback SPA.
 
 ## Validaciones
@@ -42,6 +43,8 @@
 El repositorio queda preparado mediante `render.yaml`. El servicio debe crearse como **Static Site** desde el Blueprint o desde el panel de Render. No se ha creado ni modificado el backend `uzdi-backend-api` ni una base PostgreSQL.
 
 La URL pública del frontend se añadirá únicamente después de que Render complete y se verifique el despliegue HTTPS.
+
+GitHub Pages tampoco se considera publicado todavía: GitHub rechazó que el token inicial de Actions creara el sitio automáticamente. Esta limitación no afecta al código subido ni a la compilación, que sí terminó correctamente en Ubuntu.
 
 ## Evidencias
 

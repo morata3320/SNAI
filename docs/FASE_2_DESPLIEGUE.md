@@ -54,6 +54,6 @@ El backend anunció `GET, POST, PATCH, PUT, DELETE, OPTIONS` y permitió `Conten
 
 ## Publicación y despliegue
 
-- GitHub Actions compila con mock desactivado y publica únicamente `dist` como artefacto.
+- GitHub Actions compila con mock desactivado en cada push. La publicación de `dist` se activa con la variable de repositorio `ENABLE_GITHUB_PAGES=true` una vez que Pages esté habilitado.
 - `render.yaml` define un Static Site independiente; no modifica el backend ni PostgreSQL.
 - No se publica una URL de Render hasta verificar un despliegue real.
