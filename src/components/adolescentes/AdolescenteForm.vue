@@ -1,0 +1,180 @@
+<script setup lang="ts">
+
+export interface AdolescenteFormData {
+  nombre: string
+  cedula: string
+  edad: string
+  estado: 'Activo' | 'Inactivo' | 'En proceso'
+  uzdi: string
+  fechaIngreso: string
+}
+
+export interface AdolescenteFormErrors {
+  nombre: string
+  cedula: string
+  edad: string
+  uzdi: string
+}
+
+const props = defineProps<{
+  modelValue: AdolescenteFormData
+  errors: AdolescenteFormErrors
+  saving: boolean
+  isEdit: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:modelValue': [value: AdolescenteFormData]
+  submit: []
+  cancel: []
+}>()
+
+const uzdiOptions = [
+  'UZDI Quito Norte', 'UZDI Quito Sur', 'UZDI Guayaquil',
+  'UZDI Cuenca', 'UZDI Ambato', 'UZDI Loja',
+]
+
+function update(field: keyof AdolescenteFormData, value: string) {
+  emit('update:modelValue', { ...props.modelValue, [field]: value })
+}
+</script>
+
+<template>
+  <form class="form-body" @submit.prevent="$emit('submit')">
+    <div class="field">
+      <label class="label">Nombre completo <span class="req">*</span></label>
+      <input
+        :value="modelValue.nombre"
+        class="input"
+        :class="{ 'is-error': errors.nombre }"
+        type="text"
+        placeholder="Ej. Jorge Patricio Morales"
+        @input="update('nombre', ($event.target as HTMLInputElement).value)"
+      />
+      <span v-if="errors.nombre" class="err-msg">{{ errors.nombre }}</span>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="label">Cédula <span class="req">*</span></label>
+        <input
+          :value="modelValue.cedula"
+          class="input"
+          :class="{ 'is-error': errors.cedula }"
+          type="text"
+          placeholder="1720345678"
+          maxlength="10"
+          @input="update('cedula', ($event.target as HTMLInputElement).value)"
+        />
+        <span v-if="errors.cedula" class="err-msg">{{ errors.cedula }}</span>
+      </div>
+      <div class="field">
+        <label class="label">Edad <span class="req">*</span></label>
+        <input
+          :value="modelValue.edad"
+          class="input"
+          :class="{ 'is-error': errors.edad }"
+          type="number"
+          min="10"
+          max="18"
+          placeholder="16"
+          @input="update('edad', ($event.target as HTMLInputElement).value)"
+        />
+        <span v-if="errors.edad" class="err-msg">{{ errors.edad }}</span>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="label">Estado</label>
+        <select
+          :value="modelValue.estado"
+          class="input"
+          @change="update('estado', ($event.target as HTMLSelectElement).value)"
+        >
+          <option>Activo</option>
+          <option>Inactivo</option>
+          <option>En proceso</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">UZDI <span class="req">*</span></label>
+        <select
+          :value="modelValue.uzdi"
+          class="input"
+          :class="{ 'is-error': errors.uzdi }"
+          @change="update('uzdi', ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">Seleccionar…</option>
+          <option v-for="o in uzdiOptions" :key="o">{{ o }}</option>
+        </select>
+        <span v-if="errors.uzdi" class="err-msg">{{ errors.uzdi }}</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label">Fecha de ingreso</label>
+      <input
+        :value="modelValue.fechaIngreso"
+        class="input"
+        type="date"
+        @input="update('fechaIngreso', ($event.target as HTMLInputElement).value)"
+      />
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn-ghost" @click="$emit('cancel')">Cancelar</button>
+      <button type="submit" class="btn-primary" :disabled="saving">
+        <svg v-if="saving" class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        {{ saving ? 'Guardando…' : (isEdit ? 'Guardar cambios' : 'Registrar') }}
+      </button>
+    </div>
+  </form>
+</template>
+
+<style scoped>
+.form-body { display: flex; flex-direction: column; gap: 16px; }
+.field      { display: flex; flex-direction: column; gap: 5px; }
+.field-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.label { font-size: .8rem; font-weight: 600; color: var(--color-text-secondary); }
+.label .req { color: var(--color-error); margin-left: 2px; }
+
+.input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  font-size: .875rem;
+  color: var(--color-text-primary);
+  outline: none;
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input:focus { border-color: var(--color-brand-blue); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+.input.is-error { border-color: var(--color-error); }
+
+.err-msg { font-size: .75rem; color: var(--color-error); font-weight: 500; }
+
+.actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; }
+
+.btn-primary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; background: var(--color-brand-blue); color: #fff;
+  border: none; border-radius: 8px;
+  font-size: .8125rem; font-weight: 600; cursor: pointer;
+  transition: background .15s;
+}
+.btn-primary:hover { background: var(--color-brand-dark); }
+.btn-primary:disabled { opacity: .65; cursor: not-allowed; }
+
+.btn-ghost {
+  padding: 8px 14px; background: #fff; color: var(--color-text-secondary);
+  border: 1px solid var(--color-border); border-radius: 8px;
+  font-size: .8125rem; font-weight: 500; cursor: pointer;
+}
+.btn-ghost:hover { background: var(--color-surface-soft); }
+
+.spinner { animation: spin .75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
