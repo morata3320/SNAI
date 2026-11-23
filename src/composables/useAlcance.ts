@@ -8,7 +8,8 @@ interface ConUzdi {
 
 /**
  * Alcance por UZDI (RF-02, RF-03, RF-11, RNF-05):
- * el Superadministrador ve todas las unidades; el resto solo la propia.
+ * los perfiles administrativos ADM y superadministrador ven todas las unidades;
+ * los demás perfiles conservan el alcance de su sede.
  */
 export function useAlcance() {
   const { user } = useAuth()
@@ -19,7 +20,7 @@ export function useAlcance() {
     const id = user.value?.['uzdi_id']
     return typeof id === 'number' ? id : null
   })
-  const esGlobal = computed(() => tppr.value === 4)
+  const esGlobal = computed(() => tppr.value === 3 || tppr.value === 4)
   const uzdiActual = computed(() => uzdis.value.find((u) => u.id === uzdiId.value) ?? null)
 
   function puedeVerUzdi(id: number | null | undefined): boolean {
