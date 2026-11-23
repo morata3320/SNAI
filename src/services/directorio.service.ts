@@ -20,8 +20,8 @@ interface UsuarioDirectorioApi {
   cargo?: string
   tppr_id?: number
   uzdi_id?: number
-  activo?: boolean
-  roles?: Array<{ id: number }>
+  estado?: boolean
+  perfiles?: Array<{ id: number }>
 }
 
 /** Directorio mínimo de técnicos activos de la UZDI (RF-23). */
@@ -29,13 +29,13 @@ export const directorioService = {
   async getAll(): Promise<DirectorioItem[]> {
     const { data } = await api.get<UsuarioDirectorioApi[]>(ENDPOINTS.users)
     return listaDe<UsuarioDirectorioApi>(data)
-      .filter((usuario) => usuario.activo !== false)
+      .filter((usuario) => usuario.estado !== false)
       .map((usuario) => ({
         id: usuario.id,
         nombre: usuario.nombre ?? (`${usuario.nombres ?? ''} ${usuario.apellidos ?? ''}`.trim() || usuario.login),
         login: usuario.login,
         cargo: usuario.cargo,
-        tppr_id: usuario.tppr_id ?? usuario.roles?.[0]?.id ?? 5,
+        tppr_id: usuario.tppr_id ?? 5,
         uzdi_id: usuario.uzdi_id ?? 0,
       }))
   },

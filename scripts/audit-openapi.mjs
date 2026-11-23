@@ -1,7 +1,7 @@
 const docsUrl = 'https://uzdi-backend-api.onrender.com/api/docs-json'
 
 const rutasUsadas = [
-  '/api/v1/auth/login', '/api/v1/auth/logout', '/api/v1/auth/change-password',
+  '/api/v1/auth/login', '/api/v1/auth/me', '/api/v1/auth/logout', '/api/v1/auth/change-password',
   '/api/v1/users', '/api/v1/provincia', '/api/v1/canton', '/api/v1/uzdi',
   '/api/v1/perfil', '/api/v1/permiso', '/api/v1/historial',
   '/api/v1/nacionalidad', '/api/v1/estado-civil', '/api/v1/etnia', '/api/v1/gdo',
@@ -28,6 +28,18 @@ const esquemasVacios = Object.entries(schemas)
   .map(([name]) => name)
 const ausentes = rutasUsadas.filter((path) => !paths[path])
 
+const contratosCriticos = {
+  LoginDto: ['login', 'password', 'prfl_id'],
+  CreateUserDto: ['nombres', 'apellidos', 'correo', 'login', 'password', 'tppr_id', 'perfiles_ids'],
+  CreateExpedienteDto: ['adlc_id', 'uzdi_id', 'infc_id', 'numero_causa', 'estado_procesal'],
+  CreateMedidaExpedienteDto: ['expe_id', 'mdso_id', 'orden', 'fecha_inicio', 'estado_cumplimiento'],
+}
+const contratosInvalidos = Object.entries(contratosCriticos).flatMap(([nombre, campos]) => {
+  const propiedades = schemas[nombre]?.properties ?? {}
+  const faltantes = campos.filter((campo) => !(campo in propiedades))
+  return faltantes.length ? [`${nombre}: ${faltantes.join(', ')}`] : []
+})
+
 console.log(`OpenAPI: ${spec.info?.title ?? 'sin título'} ${spec.info?.version ?? ''}`.trim())
 console.log(`Rutas: ${Object.keys(paths).length} · Operaciones: ${operaciones} · Esquemas: ${Object.keys(schemas).length}`)
 console.log(`Rutas del frontend confirmadas: ${rutasUsadas.length - ausentes.length}/${rutasUsadas.length}`)
@@ -35,6 +47,10 @@ console.log(`DTO sin propiedades documentadas: ${esquemasVacios.length}/${Object
 
 if (ausentes.length) {
   console.error(`Rutas ausentes: ${ausentes.join(', ')}`)
+  process.exitCode = 1
+}
+if (contratosInvalidos.length) {
+  console.error(`Contratos críticos incompletos: ${contratosInvalidos.join(' · ')}`)
   process.exitCode = 1
 }
 

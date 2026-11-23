@@ -8,7 +8,8 @@ import { ENDPOINTS } from '../services/backend-contract'
 export type RefSource =
   | 'adolescentes' | 'representantes' | 'expedientes' | 'talleres'
   | 'medidas' | 'uzdis' | 'usuarios' | 'provincias' | 'cantones'
-  | 'gdos' | 'perfiles' | 'infracciones'
+  | 'gdos' | 'perfiles' | 'infracciones' | 'tiposParentesco'
+  | 'tiposDocumento'
 
 export interface Opcion {
   value: number | string
@@ -81,6 +82,14 @@ async function cargarFuente(fuente: RefSource): Promise<Opcion[]> {
       const filas = await catalogoService.infracciones()
       return filas.map((i) => ({ value: i.id, label: i.nombre }))
     }
+    case 'tiposParentesco': {
+      const filas = await createCrudService<Row, Record<string, unknown>>(ENDPOINTS.tipoParentesco).getAll()
+      return filas.map((p) => ({ value: p.id, label: refNombre(p) }))
+    }
+    case 'tiposDocumento': {
+      const filas = await createCrudService<Row, Record<string, unknown>>(ENDPOINTS.tipoDocumento).getAll()
+      return filas.map((t) => ({ value: t.id, label: refNombre(t) }))
+    }
   }
 }
 
@@ -92,8 +101,9 @@ export async function opcionesDe(fuente: RefSource): Promise<Opcion[]> {
     const opciones = await cargarFuente(fuente)
     cache.set(fuente, opciones)
     return opciones
-  } catch {
-    return []
+  } catch (error) {
+    // Una consulta fallida (403/500/red) no equivale a un catálogo vacío.
+    throw new Error(`No se pudo cargar el catálogo ${fuente}. Revise la conexión y los permisos.`, { cause: error })
   }
 }
 

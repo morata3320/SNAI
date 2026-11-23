@@ -4,6 +4,7 @@ import { ENDPOINTS } from './backend-contract'
 
 export interface RolDto {
   id: number
+  codigo?: string
   nombre: string
 }
 
@@ -11,7 +12,7 @@ export interface UsuarioDto {
   id?: number
   uzdi_id?: number
   tppr_id?: number
-  tppr_ids?: number[]
+  perfiles_ids?: number[]
   cedula?: string
   cargo?: string
   nombres: string
@@ -19,8 +20,11 @@ export interface UsuarioDto {
   login: string
   correo?: string
   telefono?: string
+  sexo?: 'M' | 'F' | 'O'
+  direccion?: string
+  observaciones?: string
   password?: string
-  activo?: boolean
+  estado?: boolean
   debe_cambiar_clave?: boolean
 }
 
@@ -50,8 +54,8 @@ interface ApiUser {
   correo?: string
   login: string
   telefono?: string
-  roles?: RolDto[]
-  activo?: boolean
+  perfiles?: RolDto[]
+  estado?: boolean
   debe_cambiar_clave?: boolean
 }
 
@@ -61,7 +65,12 @@ export const usuarioService = {
       params: activo === 'true' ? undefined : { activo },
     })
     const list = listaDe<ApiUser>(res)
-    return list.map(u => ({
+    const perfiles = await Promise.all(list.map(async (u) => {
+      if (u.perfiles) return u.perfiles
+      const { data } = await api.get(`${ENDPOINTS.users}/${u.id}/perfiles`)
+      return listaDe<RolDto>(data)
+    }))
+    return list.map((u, index) => ({
       id: u.id,
       nombre: `${u.nombres} ${u.apellidos}`,
       login: u.login,
@@ -69,15 +78,15 @@ export const usuarioService = {
       cedula: u.cedula ?? '—',
       cargo: u.cargo ?? '—',
       uzdi_id: u.uzdi_id,
-      roles: u.roles ?? [],
-      estado: u.activo === false ? 'Inactivo' : 'Activo',
-      tono: u.activo === false ? 'slate' : 'green',
+      roles: perfiles[index] ?? [],
+      estado: u.estado === false ? 'Inactivo' : 'Activo',
+      tono: u.estado === false ? 'slate' : 'green',
       debeCambiarClave: !!u.debe_cambiar_clave,
       _raw: {
         id: u.id,
         uzdi_id: u.uzdi_id,
         tppr_id: u.tppr_id,
-        tppr_ids: u.roles?.map(r => r.id) ?? (u.tppr_id ? [u.tppr_id] : []),
+        perfiles_ids: perfiles[index]?.map(r => r.id) ?? [],
         cedula: u.cedula,
         cargo: u.cargo,
         nombres: u.nombres,
@@ -85,22 +94,30 @@ export const usuarioService = {
         login: u.login,
         correo: u.correo,
         telefono: u.telefono,
-        activo: u.activo,
+        estado: u.estado,
         debe_cambiar_clave: u.debe_cambiar_clave,
       },
     }))
   },
 
   async create(dto: Omit<UsuarioDto, 'id'>): Promise<UsuarioDto> {
-    const { tppr_ids, tppr_id: _tppr_id, ...rest } = dto
-    const payload = { ...rest, roles_ids: tppr_ids }
+    const payload = {
+      nombres: dto.nombres, apellidos: dto.apellidos, correo: dto.correo,
+      login: dto.login, password: dto.password, telefono: dto.telefono,
+      uzdi_id: dto.uzdi_id, tppr_id: dto.tppr_id, perfiles_ids: dto.perfiles_ids,
+      sexo: dto.sexo, direccion: dto.direccion, observaciones: dto.observaciones,
+    }
     const { data } = await api.post<UsuarioDto>(ENDPOINTS.users, payload)
     return data
   },
 
   async update(id: number, dto: Partial<UsuarioDto>): Promise<UsuarioDto> {
-    const { id: _id, tppr_ids, tppr_id: _tppr_id, ...rest } = dto
-    const payload = { ...rest, roles_ids: tppr_ids }
+    const payload = {
+      nombres: dto.nombres, apellidos: dto.apellidos, correo: dto.correo,
+      login: dto.login, password: dto.password || undefined, telefono: dto.telefono,
+      uzdi_id: dto.uzdi_id, tppr_id: dto.tppr_id, perfiles_ids: dto.perfiles_ids,
+      sexo: dto.sexo, direccion: dto.direccion, observaciones: dto.observaciones,
+    }
     const { data: res } = await api.patch<{ message: string; data: UsuarioDto }>(`${ENDPOINTS.users}/${id}`, payload)
     return ((res as { data?: UsuarioDto }).data ?? res) as UsuarioDto
   },

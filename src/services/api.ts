@@ -38,7 +38,11 @@ api.interceptors.request.use((config) => {
     ), { code: 'DELETE_DISABLED' }))
   }
   const token = localStorage.getItem('uzdi_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  // No sobrescribir el JWT explícito de /auth/me durante un nuevo login:
+  // localStorage puede contener todavía un token de la sesión anterior.
+  if (token && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${token}`)
+  }
   return config
 })
 

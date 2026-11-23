@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Ban, FilePlus2, Pencil } from '@lucide/vue'
 import DataTable from '../ui/DataTable.vue'
 import FormField from '../ui/FormField.vue'
@@ -66,11 +66,16 @@ const columnas = computed(() => {
 })
 
 const opciones = reactive<Record<string, Opcion[]>>({})
+const errorOpciones = ref('')
 
 async function cargarOpciones(): Promise<void> {
+  errorOpciones.value = ''
   const fuentes = [...new Set(props.def.fields.map((campo) => campo.ref).filter(Boolean))]
-  for (const fuente of fuentes) {
+  const resultado = await Promise.allSettled(fuentes.map(async (fuente) => {
     opciones[fuente as string] = await opcionesDe(fuente as Parameters<typeof opcionesDe>[0])
+  }))
+  if (resultado.some((item) => item.status === 'rejected')) {
+    errorOpciones.value = 'No se pudieron cargar todos los catálogos. Compruebe su conexión o los permisos de la sesión antes de registrar datos.'
   }
 }
 
@@ -138,6 +143,11 @@ async function guardarFormulario(): Promise<void> {
     {{ def.aviso }}
   </div>
 
+  <div v-if="errorOpciones" class="aviso" role="alert">
+    {{ errorOpciones }}
+    <button type="button" class="btn btn-ghost" @click="cargarOpciones">Reintentar catálogos</button>
+  </div>
+
   <div class="toolbar">
     <div v-if="def.searchKeys.length" class="tool-search">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -185,7 +195,7 @@ async function guardarFormulario(): Promise<void> {
             <Pencil :size="16" />
           </button>
           <button
-            v-if="puedeBaja && row.activo !== false"
+            v-if="puedeBaja && row.activo !== false && row.estado !== false"
             class="ico-btn danger"
             type="button"
             :title="def.bajaLabel ?? 'Desactivar'"

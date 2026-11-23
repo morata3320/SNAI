@@ -52,7 +52,9 @@ export function useCatalogos() {
     if (fallidos.length) {
       useToast().info(`No se pudieron cargar algunos catálogos: ${fallidos.join(', ')}.`)
     }
-    cargado = true
+    // Solo marcar la carga completa si todas las consultas funcionaron.
+    // Así una respuesta 403/500 no bloquea nuevos intentos al volver a la pantalla.
+    cargado = fallidos.length === 0
   }
 
   return {

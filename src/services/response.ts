@@ -1,12 +1,15 @@
 /** Colecciones REST: acepta arreglos y paginación común de APIs Nest/Express. */
 export function listaDe<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[]
-  if (!value || typeof value !== 'object') return []
+  if (value === null || value === undefined) return []
+  if (typeof value !== 'object') {
+    throw new Error('El servidor devolvió un formato inesperado para el listado.')
+  }
   const obj = value as Record<string, unknown>
   for (const key of ['items', 'results', 'rows', 'registros', 'data']) {
     if (Array.isArray(obj[key])) return obj[key] as T[]
   }
-  return []
+  throw new Error('El servidor respondió correctamente, pero el listado no tiene un formato reconocido.')
 }
 
 export function mensajeErrorApi(error: unknown, fallback: string): string {

@@ -10,13 +10,18 @@ import { useToast } from '../composables/useToast'
 import { validarCedulaEC, validarEmail, validarTelefonoEC } from '../utils/validators'
 
 const ROLES = [
-  { id: 1, nombre: 'Trabajador Social' },
-  { id: 2, nombre: 'Coordinador de área' },
-  { id: 3, nombre: 'Administrador' },
-  { id: 4, nombre: 'Superadministrador' },
-  { id: 6, nombre: 'Psicólogo' },
-  { id: 7, nombre: 'Educador' },
-  { id: 8, nombre: 'Jurídico' },
+  { id: 1, nombre: 'Administrador (ADM)' },
+  { id: 2, nombre: 'Coordinador (CORD)' },
+  { id: 3, nombre: 'Jurídico (LEGAL)' },
+  { id: 4, nombre: 'Trabajador Social (TSOC)' },
+  { id: 5, nombre: 'Psicólogo (PSIC)' },
+  { id: 6, nombre: 'Educador (EDUC)' },
+]
+
+const TIPOS_PERSONA = [
+  { id: 1, nombre: 'Técnico' }, { id: 2, nombre: 'Coordinador' },
+  { id: 3, nombre: 'Administrativo' }, { id: 4, nombre: 'Director' },
+  { id: 5, nombre: 'Otro' },
 ]
 
 const toast = useToast()
@@ -56,7 +61,7 @@ const paged      = computed(() => filtered.value.slice((page.value - 1) * PAGE_S
 
 const formInicial = (): UsuarioDto => ({
   nombres: '', apellidos: '', cedula: '', cargo: '', login: '', correo: '',
-  telefono: '', password: '', tppr_ids: [], uzdi_id: user.value?.['uzdi_id'] as number | undefined,
+  telefono: '', password: '', tppr_id: 1, perfiles_ids: [], uzdi_id: user.value?.['uzdi_id'] as number | undefined,
 })
 
 async function cargar() {
@@ -103,11 +108,15 @@ function closeModal() { modal.value = null }
 async function handleSave() {
   if (!modal.value) return
   const f = modal.value.form
-  if (!f.nombres || !f.apellidos || !f.login || !f.cedula || !f.cargo) {
-    modal.value.error = 'Nombres, apellidos, cédula, cargo y login son obligatorios.'
+  if (!f.nombres || !f.apellidos || !f.login || (!isMock && !f.correo)) {
+    modal.value.error = 'Nombres, apellidos, login y correo son obligatorios.'
     return
   }
-  if (!validarCedulaEC(f.cedula)) {
+  if (isMock && (!f.cedula || !f.cargo)) {
+    modal.value.error = 'Cédula y cargo son obligatorios en el modo demostración.'
+    return
+  }
+  if (isMock && !validarCedulaEC(f.cedula ?? '')) {
     modal.value.error = 'Ingrese una cédula ecuatoriana válida.'
     return
   }
@@ -123,7 +132,11 @@ async function handleSave() {
     modal.value.error = 'Ingrese un teléfono válido (09XXXXXXXX o 0XXXXXXXX).'
     return
   }
-  if (!f.tppr_ids?.length) {
+  if (!f.tppr_id) {
+    modal.value.error = 'Debe seleccionar el tipo institucional de persona.'
+    return
+  }
+  if (!f.perfiles_ids?.length) {
     modal.value.error = 'Debe seleccionar al menos un rol.'
     return
   }
@@ -194,7 +207,7 @@ async function handleReset(row: UsuarioRow) {
     <div class="tool-bar">
       <div class="tool-search">
         <Search :size="16" class="tool-search-icon" />
-        <input v-model="search" placeholder="Buscar por nombre, cédula, login, cargo o correo…" @input="page = 1" />
+        <input v-model="search" :placeholder="isMock ? 'Buscar por nombre, cédula, login, cargo o correo…' : 'Buscar por nombre, login o correo…'" @input="page = 1" />
       </div>
       <select v-model="filterEstado" class="tool-select" @change="onFilterChange">
         <option value="true">Estado: Activos</option>
@@ -213,7 +226,7 @@ async function handleReset(row: UsuarioRow) {
           <thead>
             <tr>
               <th>Nombre</th>
-              <th>Cédula</th>
+              <th v-if="isMock">Cédula</th>
               <th>Login</th>
               <th>UZDI</th>
               <th>Estado</th>
@@ -224,9 +237,9 @@ async function handleReset(row: UsuarioRow) {
             <tr v-for="row in paged" :key="row.id">
               <td>
                 <div class="tbl-name">{{ row.nombre }}</div>
-                <div class="tbl-sub">{{ row.cargo }} · {{ row.correo }}</div>
+                <div class="tbl-sub">{{ isMock ? `${row.cargo} · ` : '' }}{{ row.correo }}</div>
               </td>
-              <td><span class="pill">{{ row.cedula }}</span></td>
+              <td v-if="isMock"><span class="pill">{{ row.cedula }}</span></td>
               <td><code class="tbl-code">{{ row.login }}</code></td>
               <td>{{ uzdiNombre(row.uzdi_id) }}</td>
               <td>
@@ -281,7 +294,7 @@ async function handleReset(row: UsuarioRow) {
                 <input v-model="modal.form.apellidos" class="f-ctl" placeholder="Apellidos completos" required />
               </div>
             </div>
-            <div class="f2col">
+            <div v-if="isMock" class="f2col">
               <div>
                 <label class="f-label">Cédula <span class="f-req">*</span></label>
                 <input v-model="modal.form.cedula" class="f-ctl" placeholder="0000000000" maxlength="10" required />
@@ -308,15 +321,21 @@ async function handleReset(row: UsuarioRow) {
               <label class="f-label">Roles <span class="f-req">*</span></label>
               <div class="roles-grid">
                 <label v-for="r in ROLES" :key="r.id" class="role-chk">
-                  <input type="checkbox" :value="r.id" v-model="modal.form.tppr_ids" />
+                  <input type="checkbox" :value="r.id" v-model="modal.form.perfiles_ids" />
                   {{ r.nombre }}
                 </label>
               </div>
             </div>
+            <div>
+              <label class="f-label">Tipo institucional <span class="f-req">*</span></label>
+              <select v-model.number="modal.form.tppr_id" class="f-ctl" required>
+                <option v-for="tipo in TIPOS_PERSONA" :key="tipo.id" :value="tipo.id">{{ tipo.nombre }}</option>
+              </select>
+            </div>
             <div class="f2col">
               <div>
-                <label class="f-label">Correo electrónico</label>
-                <input v-model="modal.form.correo" type="email" class="f-ctl" placeholder="correo@uzdi.gob.ec" />
+                <label class="f-label">Correo electrónico <span class="f-req">*</span></label>
+                <input v-model="modal.form.correo" type="email" class="f-ctl" placeholder="correo@uzdi.gob.ec" :required="!isMock" />
               </div>
               <div>
                 <label class="f-label">Teléfono</label>

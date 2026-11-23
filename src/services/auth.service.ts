@@ -104,6 +104,8 @@ function normalizarSesion(raw: unknown, login: string): LoginResponse {
     apellidos: merged.apellidos ?? merged.apellido ?? '',
     // Perfil 5: acceso mínimo si el backend no ha enviado ningún rol.
     tppr_id: roleId ?? 5,
+    acciones_backend: Array.isArray(payload.acciones) ? payload.acciones : [],
+    perfiles_disponibles: Array.isArray(payload.perfilesDisponibles) ? payload.perfilesDisponibles : [],
   }
   if (Number.isInteger(id) && id > 0) normalizedUser.id = id
   if (Number.isInteger(uzdiId) && uzdiId > 0) normalizedUser.uzdi_id = uzdiId
@@ -126,11 +128,32 @@ function payloadLogin(login: string, password: string): Dict {
 export const authService = {
   async login(login: string, password: string): Promise<LoginResponse> {
     const { data } = await api.post<unknown>(ENDPOINTS.auth.login, payloadLogin(login, password))
-    return normalizarSesion(data, login)
+    const sesion = normalizarSesion(data, login)
+    // /auth/me es la fuente autoritativa del perfil y acciones de la sesión ya
+    // firmada. Se usa el JWT recibido sin persistirlo ni registrarlo en consola.
+    if (!USE_MOCK) {
+      const { data: me } = await api.get<unknown>(ENDPOINTS.auth.me, {
+        headers: { Authorization: `Bearer ${sesion.token}` },
+      })
+      const actual = comoObjeto(me)
+      const perfil = comoObjeto(actual.perfil)
+      const usuario = sinSecretos(comoObjeto(actual.user))
+      const codigo = perfil.codigo ?? perfil.rol_codigo
+      const rol = idDeRol(codigo) ?? sesion.user.tppr_id
+      sesion.user = {
+        ...sesion.user,
+        ...usuario,
+        prfl_id: Number(perfil.id ?? sesion.user.prfl_id),
+        rol_codigo: typeof codigo === 'string' ? codigo.toUpperCase() : sesion.user.rol_codigo,
+        tppr_id: rol,
+        acciones_backend: Array.isArray(actual.acciones) ? actual.acciones : [],
+      }
+    }
+    return sesion
   },
 
   async logout(token: string): Promise<void> {
-    await api.post(ENDPOINTS.auth.logout, undefined, {
+    await api.post(ENDPOINTS.auth.logout, {}, {
       headers: { Authorization: `Bearer ${token}` },
     })
   },

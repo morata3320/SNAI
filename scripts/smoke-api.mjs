@@ -64,12 +64,26 @@ const password = process.env.UZDI_PASSWORD
 if (!login || !password) {
   console.log('\nSin UZDI_LOGIN y UZDI_PASSWORD: solo se comprobó Health. Nada se ha autenticado.')
 } else {
-  const result = await call('POST', '/auth/login', '', { login, password })
+  // Primero observa el perfil por defecto del backend. Si la cuenta autorizada
+  // es admin y no recibe ADM, repite con el perfil confirmado por backend.
+  let result = await call('POST', '/auth/login', '', { login, password })
   if (!result?.res.ok) {
     console.log('Login fallido. Revise las credenciales autorizadas y la respuesta de Swagger.')
     process.exitCode = 1
   } else {
-    const body = result.value && typeof result.value === 'object' ? result.value : {}
+    let body = result.value && typeof result.value === 'object' ? result.value : {}
+    const perfilInicial = body.perfil && typeof body.perfil === 'object' ? body.perfil : {}
+    const codigoInicial = String(perfilInicial.codigo ?? perfilInicial.rol_codigo ?? '').toUpperCase()
+    console.log(`Perfil por defecto: ${codigoInicial || 'no informado'} (sin exponer credenciales).`)
+    if (login.trim().toLowerCase() === 'admin' && codigoInicial !== 'ADM') {
+      console.log('El backend no eligió ADM por defecto; probando la selección autorizada prfl_id=1.')
+      result = await call('POST', '/auth/login', '', { login, password, prfl_id: 1 })
+      if (!result?.res.ok) {
+        console.log('No fue posible seleccionar el perfil ADM autorizado.')
+        process.exitCode = 1
+      }
+      body = result?.value && typeof result.value === 'object' ? result.value : {}
+    }
     const tokens = body.tokens && typeof body.tokens === 'object' ? body.tokens : {}
     const token = body.token ?? body.access_token ?? body.accessToken ?? body.jwt ??
       tokens.access_token ?? tokens.accessToken
@@ -78,6 +92,7 @@ if (!login || !password) {
       process.exitCode = 1
     } else {
       console.log('Token recibido (valor oculto). Comprobando endpoints de solo lectura…\n')
+      await call('GET', '/auth/me', token)
       const rutas = [
         '/users', '/provincia', '/canton', '/uzdi', '/perfil', '/permiso',
         '/nacionalidad', '/estado-civil', '/etnia', '/gdo', '/infraccion',
