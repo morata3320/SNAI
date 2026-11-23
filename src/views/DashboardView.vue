@@ -273,7 +273,12 @@ const revisionData = computed(() =>
     .sort((a, b) => new Date(a.fecha_fin!).getTime() - new Date(b.fecha_fin!).getTime())
     .slice(0, 5)
     .map(m => ({
-      adol: `Expediente #${m.expe_id}`,
+      adol: (() => {
+        const expediente = expedientes.value.find((e) => e.id === m.expe_id)
+        return expediente?.causa && expediente.causa !== '—'
+          ? expediente.causa
+          : `Expediente #${m.expe_id}`
+      })(),
       medida: m.medida?.nombre ?? 'Medida sin nombre',
       fin: m.fecha_fin ?? '—',
       estado: m.estado_cumplimiento ?? 'En proceso',

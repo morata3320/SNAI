@@ -12,8 +12,8 @@ const router = useRouter()
   <div class="card">
     <div class="card-head">
       <div>
-        <h3>Próximos vencimientos</h3>
-        <div class="sub">Expedientes ordenados por fecha fin de medida</div>
+        <h3>Seguimiento de medidas socioeducativas</h3>
+        <div class="sub">Fechas de finalización registradas, incluidas las ya transcurridas</div>
       </div>
       <button
         class="btn btn-ghost"
@@ -26,12 +26,12 @@ const router = useRouter()
       </button>
     </div>
     <div v-if="items.length === 0" style="text-align:center;padding:32px;color:var(--color-text-muted);font-size:14px;">
-      No hay expedientes con fecha de vencimiento registrada
+      No hay expedientes con fecha de finalización registrada
     </div>
     <table v-else class="tbl">
       <thead>
         <tr>
-          <th>Adolescente</th>
+          <th>Expediente</th>
           <th>Medida</th>
           <th>Fecha fin</th>
           <th>Estado</th>
