@@ -3,6 +3,8 @@ import { useRouter } from 'vue-router'
 import { PENDIENTES } from '../config/pendientes'
 import { leerSeguridad } from '../config/seguridad'
 import { useAuth } from './useAuth'
+import { limpiarReferencias } from './useReferencias'
+import { limpiarCatalogos } from './useCatalogos'
 import { useToast } from './useToast'
 
 const EVENTOS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const
@@ -37,6 +39,8 @@ export function useInactividad() {
   function cerrarPorInactividad(): void {
     detener()
     logout()
+    limpiarReferencias()
+    limpiarCatalogos()
     toast.warn('La sesión se cerró automáticamente por inactividad.')
     router.push('/login')
   }

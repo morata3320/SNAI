@@ -2,6 +2,14 @@
 // Todo mensaje está en español y se muestra junto al campo.
 
 /** Cédula ecuatoriana: 10 dígitos, provincia 01–24 (o 30), tercer dígito < 6 y módulo 10. */
+/** Documento aceptado por CreateAdolescenteDto: cédula de 10 dígitos
+ * o pasaporte alfanumérico entre 6 y 20 caracteres.
+ * El backend realiza las validaciones definitivas.
+ */
+export function validarDocumentoUZDI(documento: string): boolean {
+  return /^(?:\d{10}|[A-Za-z0-9]{6,20})$/.test(documento.trim())
+}
+
 export function validarCedulaEC(cedula: string): boolean {
   const valor = (cedula ?? '').trim()
   if (!/^\d{10}$/.test(valor)) return false

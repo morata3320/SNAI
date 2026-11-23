@@ -6,7 +6,7 @@ import { NAV_GROUPS, navIcon, moduleLabel } from '../router/nav'
 import { useAuth } from '../composables/useAuth'
 import { authService } from '../services/auth.service'
 import { limpiarReferencias } from '../composables/useReferencias'
-import { useCatalogos } from '../composables/useCatalogos'
+import { useCatalogos, limpiarCatalogos } from '../composables/useCatalogos'
 import { usePermisos } from '../composables/usePermisos'
 import { useInactividad } from '../composables/useInactividad'
 import ConfirmModal from '../components/ui/ConfirmModal.vue'
@@ -57,6 +57,7 @@ function doLogout() {
   authLogout()
   limpiarPermisos()
   limpiarReferencias()
+  limpiarCatalogos()
   void router.replace('/login')
   // La navegación y el cierre local nunca esperan al free tier de Render.
   if (anterior) void authService.logout(anterior).catch(() => {

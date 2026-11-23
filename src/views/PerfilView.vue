@@ -29,7 +29,7 @@ const initials = computed(() =>
 
 const roles = computed(() => {
   const lista = u.value.roles as { nombre?: string }[] | undefined
-  return lista?.map(r => r.nombre).filter(Boolean).join(', ') || 'Sin rol asignado'
+  return lista?.map(r => r.nombre).filter(Boolean).join(', ') || String(u.value.rol_codigo ?? 'Sin rol asignado')
 })
 
 const uzdi = computed(() => {
