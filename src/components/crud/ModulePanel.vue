@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Ban, FilePlus2, Pencil } from '@lucide/vue'
 import DataTable from '../ui/DataTable.vue'
 import FormField from '../ui/FormField.vue'
 import ModalForm from '../ui/ModalForm.vue'
 import ConfirmModal from '../ui/ConfirmModal.vue'
 import { createCrudService } from '../../services/crud.service'
+import { ENDPOINTS } from '../../services/backend-contract'
 import { useCrud } from '../../composables/useCrud'
 import { usePermisos } from '../../composables/usePermisos'
 import { opcionesDe, type Opcion } from '../../composables/useReferencias'
@@ -48,6 +49,12 @@ const {
 
 const errores = reactive<Record<string, string>>({})
 
+// El backend exige adlc_id para adolescentes o adre_id para representantes,
+// nunca ambos. El formulario muestra únicamente la referencia aplicable.
+const camposVisibles = computed(() => props.def.fields.filter((campo) =>
+  !campo.mostrarSi || form.value[campo.mostrarSi.campo] === campo.mostrarSi.valor,
+))
+
 const puedeCrear = computed(() => puede(props.def.id, 'create'))
 const puedeEditar = computed(() => puede(props.def.id, 'edit'))
 const puedeBaja = computed(() => puede(props.def.id, 'deactivate'))
@@ -70,7 +77,7 @@ const errorOpciones = ref('')
 
 async function cargarOpciones(): Promise<void> {
   errorOpciones.value = ''
-  const fuentes = [...new Set(props.def.fields.map((campo) => campo.ref).filter(Boolean))]
+  const fuentes = [...new Set(camposVisibles.value.map((campo) => campo.ref).filter(Boolean))]
   const resultado = await Promise.allSettled(fuentes.map(async (fuente) => {
     opciones[fuente as string] = await opcionesDe(fuente as Parameters<typeof opcionesDe>[0])
   }))
@@ -81,6 +88,11 @@ async function cargarOpciones(): Promise<void> {
 
 onMounted(async () => {
   await Promise.all([recargar(), cargarOpciones()])
+})
+
+// Al elegir tipo de asistente se carga únicamente el catálogo permitido.
+watch(() => form.value.tipo_asistente, () => {
+  if (props.def.path === ENDPOINTS.asistenciaTaller) void cargarOpciones()
 })
 
 function limpiarErrores(): void {
@@ -126,13 +138,21 @@ function valorTexto(key: string): string {
 
 async function guardarFormulario(): Promise<void> {
   limpiarErrores()
-  for (const campo of props.def.fields) {
+  for (const campo of camposVisibles.value) {
     const mensaje = validarCampo(campo, form.value[campo.key], form.value)
     if (mensaje) errores[campo.key] = mensaje
   }
   if (Object.keys(errores).length) {
     toast.error('Revise los campos marcados antes de guardar.')
     return
+  }
+  if (props.def.path === ENDPOINTS.asistenciaTaller) {
+    if (form.value.tipo_asistente === 'representante') {
+      // La validación del backend exige explícitamente adlc_id nulo.
+      form.value.adlc_id = null
+    } else if (form.value.tipo_asistente === 'adolescente') {
+      form.value.adre_id = null
+    }
   }
   await guardar()
 }
@@ -223,7 +243,7 @@ async function guardarFormulario(): Promise<void> {
       <div class="fsec-title">Datos del registro</div>
       <div class="frow">
         <FormField
-          v-for="campo in def.fields"
+          v-for="campo in camposVisibles"
           :key="campo.key"
           :label="campo.label"
           :required="campo.required"
