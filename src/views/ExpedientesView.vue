@@ -79,7 +79,7 @@ const form = reactive({ ...defaultForm })
 
 const formValido = computed(() =>
   form.adlc_id > 0 && form.uzdi_id > 0 && form.infc_id > 0 &&
-  !!form.estado_procesal && !!form.numero_causa.trim()
+  !!form.estado_procesal
 )
 
 function openNew() {
