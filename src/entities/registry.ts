@@ -125,19 +125,17 @@ const campoActivo: ColumnaDef = { key: 'activo', label: 'Estado', value: (r) => 
 export const GDO: ModuloDef = {
   id: 'gdos',
   path: ENDPOINTS.gdo,
-  title: 'Grupos de desarrollo organizacional',
+  title: 'Grupos Delictivos Organizados (GDO)',
   subtitle: 'Catálogo de GDO. Solo los grupos activos se ofrecen en nuevos registros.',
   singular: 'el GDO',
   bajaLabel: 'Desactivar GDO',
   bajaAviso: 'El GDO dejará de ofrecerse en nuevos registros; los adolescentes vinculados conservan su historial.',
-  searchKeys: ['nombre', 'descripcion'],
+  searchKeys: ['nombre'],
   fields: [
     { key: 'nombre', label: 'Nombre del grupo', required: true, placeholder: 'Ej. GDO Alfa' },
-    { key: 'descripcion', label: 'Descripción', type: 'textarea', ancho: 'full' },
   ],
   columns: [
     { key: 'nombre', label: 'GDO', value: (r) => texto(r, 'nombre') },
-    { key: 'descripcion', label: 'Descripción', value: (r) => texto(r, 'descripcion') },
     campoActivo,
   ],
 }
@@ -448,7 +446,6 @@ export const MEDIDA: ModuloDef = {
   fields: [
     { key: 'nombre', label: 'Nombre de la medida', required: true, ancho: 'full' },
     { key: 'duracion_meses', label: 'Duración de referencia (meses)', type: 'number' },
-    { key: 'descripcion', label: 'Descripción', type: 'textarea', ancho: 'full' },
   ],
   columns: [
     { key: 'nombre', label: 'Medida', value: (r) => texto(r, 'nombre') },
