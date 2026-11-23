@@ -94,7 +94,7 @@ export const MODULE_ACCESS: Record<ModuleId, Partial<Record<RoleKey, Action[]>>>
   permisos: { superadmin: CE, admin: V },
   parametros: { superadmin: CE, admin: CE },
   adolescentes: {
-    superadmin: V, admin: V, coordinador: V, tsocial: CEB,
+    superadmin: CE, admin: CE, coordinador: V, tsocial: CEB,
     psicologo: V, educador: V, juridico: V,
   },
   representantes: { coordinador: V, tsocial: CEB },
@@ -105,10 +105,10 @@ export const MODULE_ACCESS: Record<ModuleId, Partial<Record<RoleKey, Action[]>>>
   talleres: { coordinador: V, psicologo: CEB, educador: CEB },
   'asistencia-talleres': { coordinador: V, psicologo: CE, educador: CE },
   expedientes: {
-    admin: V, coordinador: V, tsocial: V, juridico: CE,
+    superadmin: CE, admin: CE, coordinador: V, tsocial: V, juridico: CE,
   },
   medidas: {
-    admin: V, tsocial: V, psicologo: V, educador: V, juridico: CEB,
+    superadmin: CE, admin: CE, tsocial: V, psicologo: V, educador: V, juridico: CEB,
   },
   documentos: { juridico: ['view', 'create', 'edit', 'deactivate'] },
   gdos: { admin: CEB, tsocial: V },

@@ -62,7 +62,8 @@ const generated    = ref(false)
 const errorCarga   = ref('')
 
 const rol = computed(() => roleKey((user.value?.['tppr_id'] as number | undefined) ?? null))
-const esSuperadmin = computed(() => rol.value === 'superadmin')
+// El backend permite acceso administrativo transversal tanto a ADM como a superadmin.
+const esAccesoGlobal = computed(() => rol.value === 'superadmin' || rol.value === 'admin')
 const uzdiUsuarioId = computed(() => (user.value?.['uzdi_id'] as number | undefined) ?? null)
 
 const REPORTES_POR_ROL: Record<RoleKey, string[]> = {
@@ -103,7 +104,7 @@ const defaultForm = {
 const form = reactive({ ...defaultForm })
 
 const uzdiOptions = computed(() =>
-  esSuperadmin.value
+  esAccesoGlobal.value
     ? uzdis.value.map(u => u.nombre)
     : uzdis.value.filter(u => u.id === uzdiUsuarioId.value).map(u => u.nombre)
 )
@@ -151,7 +152,7 @@ async function cargarDatosOpcionales() {
 onMounted(async () => {
   await cargarCatalogos()
   form.tipo = tiposDisponibles.value[0] ?? ''
-  form.zona = esSuperadmin.value ? 'Todas las zonas' : zonaUsuario.value
+  form.zona = esAccesoGlobal.value ? 'Todas las zonas' : zonaUsuario.value
   try {
     const [resultadoAdolescentes, resultadoExpedientes] = await Promise.allSettled([
       adolescenteService.getAll(),
@@ -172,7 +173,7 @@ function resetForm() {
   Object.assign(form, {
     ...defaultForm,
     tipo: tiposDisponibles.value[0] ?? '',
-    zona: esSuperadmin.value ? 'Todas las zonas' : zonaUsuario.value,
+    zona: esAccesoGlobal.value ? 'Todas las zonas' : zonaUsuario.value,
     fechaDesde: inicioAnio(),
     fechaHasta: hoyISO(),
   })
@@ -200,6 +201,19 @@ function coincideZona(uzdiId?: number | null): boolean {
   return !zonaId.value || uzdiId === zonaId.value
 }
 
+// Adolescente no posee uzdi_id en el DTO DDL v8. Su sede de seguimiento
+// se obtiene de los expedientes que lo vinculan a una UZDI. Nunca se asume
+// que un adolescente sin expediente pertenezca a una sede específica.
+function coincideZonaAdolescente(adolescente: AdolRow): boolean {
+  if (!zonaId.value) return true
+  if (typeof adolescente._raw.uzdi_id === 'number') {
+    return adolescente._raw.uzdi_id === zonaId.value
+  }
+  return expedientes.value.some((expediente) =>
+    expediente._raw.adlc_id === adolescente.id && expediente._raw.uzdi_id === zonaId.value,
+  )
+}
+
 function enRango(iso?: string | null): boolean {
   if (!iso) return false
   const fecha = iso.substring(0, 10)
@@ -207,7 +221,7 @@ function enRango(iso?: string | null): boolean {
 }
 
 const adolescentesFiltrados = computed(() =>
-  adolescentes.value.filter(a => coincideZona(a._raw.uzdi_id) && enRango(a._raw.fecha_ingr))
+  adolescentes.value.filter(a => coincideZonaAdolescente(a) && enRango(a._raw.fecha_ingr))
 )
 const expedientesFiltrados = computed(() =>
   expedientes.value.filter(e => coincideZona(e._raw.uzdi_id))
@@ -497,17 +511,20 @@ const fechaRangoLabel = computed(() => {
         </div>
         <div class="f">
           <label class="f-label" for="rep-zona">Zona / UZDI <span class="req">*</span></label>
-          <select id="rep-zona" class="f-ctl" v-model="form.zona" :disabled="!esSuperadmin">
-            <option v-if="esSuperadmin" value="Todas las zonas">Todas las zonas</option>
+          <select id="rep-zona" class="f-ctl" v-model="form.zona" :disabled="!esAccesoGlobal">
+            <option v-if="esAccesoGlobal" value="Todas las zonas">Todas las zonas</option>
             <option v-for="z in uzdiOptions" :key="z" :value="z">{{ z }}</option>
           </select>
-          <div v-if="!esSuperadmin" class="f-help">Fijada a su UZDI por alcance de datos.</div>
+          <div v-if="!esAccesoGlobal" class="f-help">
+            {{ zonaUsuario ? 'Fijada a su UZDI por alcance de datos.' : 'Su cuenta no tiene una UZDI asignada. Consulte con el administrador.' }}
+          </div>
         </div>
       </div>
       <div class="frow c2">
         <div class="f">
           <label class="f-label" for="rep-desde">Fecha desde <span class="req">*</span></label>
           <input id="rep-desde" class="f-ctl" type="date" v-model="form.fechaDesde" />
+          <div class="f-help">Para incluir ingresos de 2025, seleccione una fecha desde ese año.</div>
         </div>
         <div class="f">
           <label class="f-label" for="rep-hasta">Fecha hasta <span class="req">*</span></label>
