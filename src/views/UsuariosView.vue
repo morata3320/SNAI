@@ -284,7 +284,7 @@ async function handleReset(row: UsuarioRow) {
           <div v-if="modal.error" class="modal-error">{{ modal.error }}</div>
 
           <form id="modal-user-form" @submit.prevent="handleSave" class="modal-form">
-            <div v-if="isMock" class="f2col">
+            <div class="f2col">
               <div>
                 <label class="f-label">Nombres <span class="f-req">*</span></label>
                 <input v-model="modal.form.nombres" class="f-ctl" placeholder="Nombres completos" required />
@@ -294,7 +294,7 @@ async function handleReset(row: UsuarioRow) {
                 <input v-model="modal.form.apellidos" class="f-ctl" placeholder="Apellidos completos" required />
               </div>
             </div>
-            <div class="f2col">
+            <div v-if="isMock" class="f2col">
               <div>
                 <label class="f-label">Cédula <span class="f-req">*</span></label>
                 <input v-model="modal.form.cedula" class="f-ctl" placeholder="0000000000" maxlength="10" required />
