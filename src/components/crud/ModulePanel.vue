@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Ban, FilePlus2, Pencil } from '@lucide/vue'
 import DataTable from '../ui/DataTable.vue'
 import FormField from '../ui/FormField.vue'
@@ -66,11 +66,16 @@ const columnas = computed(() => {
 })
 
 const opciones = reactive<Record<string, Opcion[]>>({})
+const errorOpciones = ref('')
 
 async function cargarOpciones(): Promise<void> {
+  errorOpciones.value = ''
   const fuentes = [...new Set(props.def.fields.map((campo) => campo.ref).filter(Boolean))]
-  for (const fuente of fuentes) {
+  const resultado = await Promise.allSettled(fuentes.map(async (fuente) => {
     opciones[fuente as string] = await opcionesDe(fuente as Parameters<typeof opcionesDe>[0])
+  }))
+  if (resultado.some((item) => item.status === 'rejected')) {
+    errorOpciones.value = 'No se pudieron cargar todos los catálogos. Compruebe su conexión o los permisos de la sesión antes de registrar datos.'
   }
 }
 
@@ -136,6 +141,11 @@ async function guardarFormulario(): Promise<void> {
 <template>
   <div v-if="def.aviso" class="aviso" role="note">
     {{ def.aviso }}
+  </div>
+
+  <div v-if="errorOpciones" class="aviso" role="alert">
+    {{ errorOpciones }}
+    <button type="button" class="btn btn-ghost" @click="cargarOpciones">Reintentar catálogos</button>
   </div>
 
   <div class="toolbar">
