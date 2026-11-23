@@ -312,7 +312,7 @@ export const ASISTENCIA_TALLER: ModuloDef = {
     { key: 'tipo_asistente', label: 'Tipo de asistente', type: 'select', options: ['adolescente', 'representante'], required: true },
     { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true, mostrarSi: { campo: 'tipo_asistente', valor: 'adolescente' } },
     { key: 'adre_id', label: 'Vínculo adolescente–representante', type: 'ref', ref: 'vinculos', required: true, mostrarSi: { campo: 'tipo_asistente', valor: 'representante' }, hint: 'Seleccione el vínculo registrado previamente para el representante.' },
-    { key: 'asistio', label: 'Asistió', type: 'checkbox' }
+    { key: 'asistio', label: 'Asistió', type: 'checkbox' },
     { key: 'observaciones', label: 'Observaciones', type: 'textarea', ancho: 'full' },
   ],
   columns: [
