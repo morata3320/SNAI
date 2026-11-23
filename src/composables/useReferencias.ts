@@ -9,7 +9,7 @@ export type RefSource =
   | 'adolescentes' | 'representantes' | 'expedientes' | 'talleres'
   | 'medidas' | 'uzdis' | 'usuarios' | 'provincias' | 'cantones'
   | 'gdos' | 'perfiles' | 'infracciones' | 'tiposParentesco'
-  | 'tiposDocumento'
+  | 'tiposDocumento' | 'vinculos'
 
 export interface Opcion {
   value: number | string
@@ -48,6 +48,13 @@ async function cargarFuente(fuente: RefSource): Promise<Opcion[]> {
       return filas.map((t) => ({
         value: t.id,
         label: `${String(t.nombre ?? 'Taller')} · ${String(t.fecha ?? '')}`,
+      }))
+    }
+    case 'vinculos': {
+      const filas = await createCrudService<Row, Record<string, unknown>>(ENDPOINTS.adolescenteRepresentante).getAll()
+      return filas.map((vinculo) => ({
+        value: vinculo.id,
+        label: `Vínculo #${vinculo.id} · Adolescente #${String(vinculo.adlc_id ?? '?')} · Representante #${String(vinculo.repr_id ?? '?')}`,
       }))
     }
     case 'medidas': {
