@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { Users2, UserPlus, Pencil, X as XIcon, Save, Search, KeyRound, Ban } from '@lucide/vue'
 import { usuarioService, type UsuarioDto, type UsuarioRow } from '../services/usuario.service'
+import api from '../services/api'
+import { ENDPOINTS } from '../services/backend-contract'
+import { listaDe } from '../services/response'
 import { catalogoService, type UzdiItem } from '../services/catalogo.service'
 import { USE_MOCK } from '../services/backend-contract'
 import { useAuth } from '../composables/useAuth'
@@ -9,14 +12,17 @@ import { usePermisos } from '../composables/usePermisos'
 import { useToast } from '../composables/useToast'
 import { validarCedulaEC, validarEmail, validarTelefonoEC } from '../utils/validators'
 
-const ROLES = [
-  { id: 1, nombre: 'Administrador (ADM)' },
-  { id: 2, nombre: 'Coordinador (CORD)' },
-  { id: 3, nombre: 'Jurídico (LEGAL)' },
-  { id: 4, nombre: 'Trabajador Social (TSOC)' },
-  { id: 5, nombre: 'Psicólogo (PSIC)' },
-  { id: 6, nombre: 'Educador (EDUC)' },
-]
+// Los identificadores de perfil pueden cambiar con las migraciones.
+// No asignar roles por una lista de IDs codificada manualmente.
+const rolesDisponibles = ref<{ id: number; nombre: string }[]>([])
+const CODIGOS_ASIGNABLES = new Set(['ADM', 'CORD', 'LEGAL', 'TSOC', 'PSIC', 'EDUC'])
+interface PerfilCatalogo {
+  id: number
+  codigo?: string
+  nombre: string
+  estado?: boolean
+  activo?: boolean
+}
 
 const TIPOS_PERSONA = [
   { id: 1, nombre: 'Técnico' }, { id: 2, nombre: 'Coordinador' },
@@ -79,8 +85,21 @@ async function cargarUzdis() {
   uzdis.value = await catalogoService.uzdis()
 }
 
+async function cargarPerfiles() {
+  try {
+    const { data } = await api.get<unknown>(ENDPOINTS.perfil)
+    rolesDisponibles.value = listaDe<PerfilCatalogo>(data)
+      .filter((p) => p.estado !== false && p.activo !== false &&
+        CODIGOS_ASIGNABLES.has(String(p.codigo ?? '').toUpperCase()))
+      .map((p) => ({ id: p.id, nombre: `${p.nombre} (${String(p.codigo).toUpperCase()})` }))
+  } catch {
+    rolesDisponibles.value = []
+    toast.error('No fue posible consultar los perfiles disponibles en el backend.')
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([cargarUzdis(), cargar()])
+  await Promise.all([cargarUzdis(), cargarPerfiles(), cargar()])
 })
 
 const uzdiNombre = (id?: number) => uzdis.value.find(u => u.id === id)?.nombre ?? (id ? `UZDI #${id}` : '—')
@@ -138,6 +157,14 @@ async function handleSave() {
   }
   if (!f.perfiles_ids?.length) {
     modal.value.error = 'Debe seleccionar al menos un rol.'
+    return
+  }
+  if (!rolesDisponibles.value.length) {
+    modal.value.error = 'No se han podido cargar los perfiles institucionales.'
+    return
+  }
+  if (f.perfiles_ids?.some((id) => !rolesDisponibles.value.some((r) => r.id === id))) {
+    modal.value.error = 'Seleccione únicamente perfiles autorizados disponibles.'
     return
   }
   if (modal.value.mode === 'new' && (f.password ?? '').length < 8) {
@@ -320,7 +347,7 @@ async function handleReset(row: UsuarioRow) {
             <div>
               <label class="f-label">Roles <span class="f-req">*</span></label>
               <div class="roles-grid">
-                <label v-for="r in ROLES" :key="r.id" class="role-chk">
+                <label v-for="r in rolesDisponibles" :key="r.id" class="role-chk">
                   <input type="checkbox" :value="r.id" v-model="modal.form.perfiles_ids" />
                   {{ r.nombre }}
                 </label>
