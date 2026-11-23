@@ -5,7 +5,7 @@ import { adolescenteService } from '../services/adolescente.service'
 import { useCatalogos } from '../composables/useCatalogos'
 import { usePermisos } from '../composables/usePermisos'
 import { useToast } from '../composables/useToast'
-import { validarCedulaEC, fechaNoFutura } from '../utils/validators'
+import { validarDocumentoUZDI, fechaNoFutura } from '../utils/validators'
 import { UserPlus, Pencil, Ban, Eye, Save, X } from '@lucide/vue'
 
 type ModalMode = 'new' | 'edit' | 'deactivate' | null
@@ -112,7 +112,7 @@ function openDeactivate(id: number) {
 }
 
 const formValido = computed(() =>
-  !!form.nombre && !!form.apellido && validarCedulaEC(form.ced) && !!form.fecha_nac && !!form.sexo &&
+  !!form.nombre && !!form.apellido && validarDocumentoUZDI(form.ced) && !!form.fecha_nac && !!form.sexo &&
   !!form.fecha_ingr && fechaNoFutura(form.fecha_ingr) &&
   form.nacn_id > 0 && form.etcv_id > 0 && form.etna_id > 0 &&
   form.provincia_id > 0 && form.cntn_id > 0,
@@ -284,7 +284,7 @@ const selectedRow = () => rows.value.find(a => a.id === selectedId.value)
           <div class="fsec-title">Datos personales</div>
           <div class="frow c3">
             <div class="f">
-              <div class="f-label">Cédula de identidad <span class="req">*</span></div>
+              <div class="f-label">Cédula o pasaporte <span class="req">*</span></div>
               <input class="f-ctl" v-model="form.ced" placeholder="0000000000" maxlength="20" />
             </div>
             <div class="f">
