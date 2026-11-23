@@ -38,6 +38,8 @@ export interface CampoDef {
   hint?: string
   placeholder?: string
   ancho?: 'full'
+  /** Muestra el campo únicamente si otro campo tiene el valor indicado. */
+  mostrarSi?: { campo: string; valor: string }
   validate?: (value: unknown, form: Record<string, unknown>) => string
 }
 
@@ -310,8 +312,9 @@ export const ASISTENCIA_TALLER: ModuloDef = {
   fields: [
     { key: 'tall_id', label: 'Taller', type: 'ref', ref: 'talleres', required: true },
     { key: 'tipo_asistente', label: 'Tipo de asistente', type: 'select', options: ['adolescente', 'representante'], required: true },
-    { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true },
-    { key: 'asistio', label: 'Asistió', type: 'checkbox' },
+    { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true, mostrarSi: { campo: 'tipo_asistente', valor: 'adolescente' } },
+    { key: 'adre_id', label: 'Vínculo adolescente–representante', type: 'ref', ref: 'vinculos', required: true, mostrarSi: { campo: 'tipo_asistente', valor: 'representante' }, hint: 'Seleccione el vínculo registrado previamente para el representante.' },
+    { key: 'asistio', label: 'Asistió', type: 'checkbox' }
     { key: 'observaciones', label: 'Observaciones', type: 'textarea', ancho: 'full' },
   ],
   columns: [
