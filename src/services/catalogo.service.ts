@@ -13,7 +13,10 @@ export interface ProvinciaItem extends CatalogoItem {
 }
 
 export interface CantonItem extends CatalogoItem {
+  /** El backend devuelve prov_id y provincia, no provincia_id. */
+  prov_id?: number
   provincia_id?: number
+  provincia?: CatalogoItem
   activo?: boolean
 }
 
@@ -44,7 +47,10 @@ export const catalogoService = {
   estadosCiviles: () => fetchList<CatalogoItem>(ENDPOINTS.estadoCivil),
   etnias: () => fetchList<CatalogoItem>(ENDPOINTS.etnia),
   gdos: () => fetchList<CatalogoItem>(ENDPOINTS.gdo),
-  cantones: () => fetchList<CantonItem>(ENDPOINTS.canton),
+  cantones: async () => (await fetchList<CantonItem>(ENDPOINTS.canton)).map((c) => ({
+    ...c,
+    provincia_id: c.prov_id ?? c.provincia?.id ?? c.provincia_id,
+  })),
   provincias: () => fetchList<ProvinciaItem>(ENDPOINTS.provincia),
   uzdis: () => fetchList<UzdiItem>(ENDPOINTS.uzdi),
   infracciones: () => fetchList<InfraccionItem>(ENDPOINTS.infraccion),
