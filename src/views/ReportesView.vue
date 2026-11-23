@@ -7,15 +7,13 @@ import { adolescenteService } from '../services/adolescente.service'
 import { expedienteService } from '../services/expediente.service'
 import { roleKey, type RoleKey } from '../router/access'
 import api from '../services/api'
-import { reportesService, type FormatoInstitucional } from '../services/reportes.service'
+import { descargarInformeXlsx, type FilaInforme } from '../utils/exportarInformeXlsx'
 import { ENDPOINTS } from '../services/backend-contract'
-import { mensajeErrorApi } from '../services/response'
 import { listaDe } from '../services/response'
 
 const { uzdis, cargarCatalogos } = useCatalogos()
 const { user } = useAuth()
 const toast = useToast()
-const descargandoInstitucional = ref<FormatoInstitucional | null>(null)
 
 type AdolRow = Awaited<ReturnType<typeof adolescenteService.getAll>>[number]
 type ExpeRow = Awaited<ReturnType<typeof expedienteService.getAll>>[number]
@@ -226,6 +224,22 @@ const adolescentesFiltrados = computed(() =>
 const expedientesFiltrados = computed(() =>
   expedientes.value.filter(e => coincideZona(e._raw.uzdi_id))
 )
+
+// Fuente única de la tabla de detalle, de la impresión y del Excel.
+// Utiliza GET /expediente y GET /medida-expediente, que ya muestran registros.
+const filasExpedientes = computed<FilaInforme[]>(() =>
+  expedientesFiltrados.value.map((expediente) => {
+    const medidas = medidasExpediente.value.filter(m => m.expe_id === expediente.id)
+    return {
+      numeroCausa: expediente.causa !== '—' ? expediente.causa : expediente.codigo,
+      estado: expediente.estado,
+      uzdi: expediente.uzdi,
+      infraccion: expediente.infraccion,
+      medidas: medidas.map(m => m.medida?.nombre || 'Medida sin nombre').join('; ') || 'Sin medidas',
+      cumplimiento: medidas.map(m => m.estado_cumplimiento || 'Sin estado').join('; ') || 'Sin medidas',
+    }
+  }),
+)
 const representantesFiltrados = computed(() =>
   representantes.value.filter(r => coincideZona(r.uzdi_id) && enRango(r.creado_en))
 )
@@ -253,38 +267,49 @@ async function descargarPDF() {
   window.print()
 }
 
-async function descargarInstitucional(formato: FormatoInstitucional) {
-  if (descargandoInstitucional.value) return
-  descargandoInstitucional.value = formato
-  try {
-    await reportesService.descargarInstitucional(formato, {
-      ...(zonaId.value ? { uzdi_id: zonaId.value } : {}),
-    })
-    toast.success(`Descarga institucional ${formato.toUpperCase()} iniciada.`)
-  } catch (error) {
-    toast.error(mensajeErrorApi(error, error instanceof Error ? error.message : 'No se pudo descargar el archivo del backend.'))
-  } finally {
-    descargandoInstitucional.value = null
-  }
+function exportarExcel(): void {
+  if (!generated.value || !formValido.value || loadingData.value) return
+  descargarInformeXlsx({
+    titulo: form.tipo,
+    zona: form.zona,
+    periodo: form.periodo,
+    desde: form.fechaDesde,
+    hasta: form.fechaHasta,
+    indicadores: reporteData.value.filas.map((f) => ({
+      indicador: f.indicador,
+      valor: f.valor,
+    })),
+    expedientes: filasExpedientes.value,
+  })
+  toast.success('Informe Excel (.xlsx) descargado con los datos de la API UZDI.')
 }
 
 async function exportarCSV() {
-  const filas = reporteData.value.filas
-  const escapar = (valor: string | number) => `"${String(valor).replace(/"/g, '""')}"`
-  const contenido = [
-    escapar('Indicador'), escapar('Valor'),
-    ...filas.map(f => `${escapar(f.indicador)},${escapar(f.valor)}`),
-  ].join('\r\n')
+  const escapar = (valor: string | number) => {
+    const texto = String(valor)
+    // Evitar interpretación de fórmulas al abrir en una hoja de cálculo.
+    const seguro = /^[=+\-@]/.test(texto) ? "'" + texto : texto
+    return '"' + seguro.replace(/"/g, '""') + '"'
+  }
+  const filas = [['Indicador', 'Valor'], ...reporteData.value.filas.map((f) =>
+    [f.indicador, String(f.valor)],
+  )]
+  // Excel en configuración regional española suele usar punto y coma.
+  const contenido = 'sep=;\r\n' + filas
+    .map((fila) => fila.map((valor) => escapar(valor)).join(';'))
+    .join('\r\n')
   const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const enlace = document.createElement('a')
   const tipo = (form.tipo || 'estadistico-general').toLowerCase().replace(/[^a-z0-9]+/g, '-')
   enlace.href = url
-  enlace.download = `reporte-${tipo}-${new Date().toISOString().slice(0, 10)}.csv`
+  enlace.download = 'reporte-' + tipo + '-' + new Date().toISOString().slice(0, 10) + '.csv'
+  document.body.appendChild(enlace)
   enlace.click()
-  URL.revokeObjectURL(url)
+  enlace.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
   await registrarDescarga('CSV')
-  toast.success('Reporte exportado en CSV compatible con Excel.')
+  toast.success('CSV exportado con columnas Indicador y Valor.')
 }
 
 function diasHasta(isoDate: string) {
@@ -485,7 +510,7 @@ const fechaRangoLabel = computed(() => {
     <div class="card-head">
       <h3>Configuración del reporte</h3>
       <p style="font-size:13px;color:var(--color-text-secondary);margin:0;">
-        Los tipos de reporte disponibles se ajustan a su perfil. Los datos son siempre agregados.
+        Informes generados con datos reales de la API. El reporte incluye indicadores y detalle de expedientes autorizados.
       </p>
     </div>
     <div class="card-body">
@@ -570,9 +595,8 @@ const fechaRangoLabel = computed(() => {
       </div>
       <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-sm" type="button" title="Descarga CSV compatible con Excel" :disabled="!formValido" @click="exportarCSV">Exportar CSV (Excel)</button>
-        <button class="btn btn-sm btn-primary" type="button" :disabled="!formValido" @click="descargarPDF">Imprimir o guardar PDF</button>
-        <button class="btn btn-sm" type="button" title="Archivo Excel consolidado del backend; puede no respetar los filtros locales." :disabled="!!descargandoInstitucional" @click="descargarInstitucional('excel')">{{ descargandoInstitucional === 'excel' ? 'Descargando…' : 'Excel institucional (.xlsx)' }}</button>
-        <button class="btn btn-sm" type="button" title="PDF consolidado del backend; puede no respetar los filtros locales." :disabled="!!descargandoInstitucional" @click="descargarInstitucional('pdf')">{{ descargandoInstitucional === 'pdf' ? 'Descargando…' : 'PDF institucional' }}</button>
+        <button class="btn btn-sm btn-primary" type="button" :disabled="!formValido" @click="descargarPDF">Imprimir informe / Guardar PDF</button>
+        <button class="btn btn-sm" type="button" title="Informe Excel real (.xlsx) generado con los expedientes e indicadores visibles" :disabled="!formValido" @click="exportarExcel">Descargar Excel (.xlsx)</button>
       </div>
     </div>
     <div class="card-body">
@@ -609,6 +633,147 @@ const fechaRangoLabel = computed(() => {
       <div v-else class="empty" style="padding:24px;">
         <p>Sin datos para mostrar. Ajuste el rango de fechas o registre información primero.</p>
       </div>
+      <div v-if="filasExpedientes.length" class="detalle-reporte">
+        <h3>Detalle de expedientes de la UZDI seleccionada</h3>
+        <p class="f-help">Datos obtenidos del backend con la sesión autorizada. No incluye documentos de identidad.</p>
+        <div class="tbl-card">
+          <table class="tbl">
+            <thead>
+              <tr><th>N.º causa</th><th>Estado</th><th>UZDI</th><th>Infracción</th><th>Medida socioeducativa</th><th>Cumplimiento</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="exp in filasExpedientes" :key="exp.numeroCausa">
+                <td>{{ exp.numeroCausa }}</td>
+                <td>{{ exp.estado }}</td>
+                <td>{{ exp.uzdi }}</td>
+                <td>{{ exp.infraccion }}</td>
+                <td>{{ exp.medidas }}</td>
+                <td>{{ exp.cumplimiento }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="f-help" style="margin-top:16px;">
+        El rango temporal filtra las fechas de ingreso de adolescentes y de inicio de medidas;
+        los expedientes se agrupan por sede UZDI. La fuente es la API institucional autenticada.
+      </p>
     </div>
   </div>
+
+  <!-- Hoja exclusiva de impresión: no imprime formularios, navegación ni botones. -->
+  <Teleport to="body">
+    <section v-if="generated" id="uzdi-informe-impresion" class="uzdi-informe-impresion">
+      <div class="informe-cabecera">
+        <div class="informe-entidad">SERVICIO NACIONAL DE ATENCIÓN INTEGRAL — UZDI / SNAI</div>
+        <h1>{{ form.tipo }}</h1>
+        <p>Informe de análisis estadístico y seguimiento institucional</p>
+      </div>
+      <div class="informe-metadatos">
+        <div><b>Zona / UZDI:</b> {{ form.zona }}</div>
+        <div><b>Período:</b> {{ form.periodo }}</div>
+        <div><b>Desde:</b> {{ form.fechaDesde }}</div>
+        <div><b>Hasta:</b> {{ form.fechaHasta }}</div>
+        <div><b>Fecha de emisión:</b> {{ new Date().toLocaleString('es-EC') }}</div>
+        <div><b>Origen:</b> API real UZDI/SNAI</div>
+      </div>
+      <h2>1. Resumen de indicadores</h2>
+      <table class="informe-tabla">
+        <thead><tr><th>Indicador</th><th class="num">Cantidad</th></tr></thead>
+        <tbody>
+          <tr v-for="fila in reporteData.filas" :key="fila.indicador">
+            <td>{{ fila.indicador }}</td><td class="num">{{ fila.valor }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <template v-if="filasExpedientes.length">
+        <h2>2. Detalle de expedientes</h2>
+        <table class="informe-tabla">
+          <thead>
+            <tr>
+              <th>N.º causa</th><th>Estado</th><th>UZDI</th><th>Infracción</th>
+              <th>Medida socioeducativa</th><th>Cumplimiento</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="exp in filasExpedientes" :key="exp.numeroCausa">
+              <td>{{ exp.numeroCausa }}</td><td>{{ exp.estado }}</td><td>{{ exp.uzdi }}</td>
+              <td>{{ exp.infraccion }}</td><td>{{ exp.medidas }}</td><td>{{ exp.cumplimiento }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+      <p class="informe-metodologia">
+        <b>Nota metodológica:</b> Los indicadores se calculan a partir de las consultas
+        autenticadas de la API. El rango temporal afecta a los ingresos y al inicio de medidas;
+        los expedientes se seleccionan por sede UZDI. No se incluyen datos simulados por el navegador.
+      </p>
+      <footer class="informe-pie">UZDI / SNAI · Informe generado por el sistema · {{ new Date().toLocaleDateString('es-EC') }}</footer>
+    </section>
+  </Teleport>
 </template>
+
+<style>
+.detalle-reporte { margin-top: 24px; }
+.detalle-reporte h3 { margin: 0 0 6px; font-weight: 700; font-size: 16px; }
+.detalle-reporte .tbl-card { margin-top: 12px; }
+.detalle-reporte .tbl { min-width: 900px; }
+.detalle-reporte .tbl td { font-size: 12px; vertical-align: top; }
+@media screen {
+  #uzdi-informe-impresion { display: none !important; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 13mm; }
+  html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+  #app { display: none !important; }
+  body > #uzdi-informe-impresion {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    color: #17213b !important;
+    background: white !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 10pt !important;
+  }
+  #uzdi-informe-impresion * { box-sizing: border-box; }
+  #uzdi-informe-impresion .informe-cabecera {
+    color: #fff !important;
+    background: #243c79 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 15px 20px;
+    margin-bottom: 18px;
+  }
+  #uzdi-informe-impresion .informe-entidad { font-size: 10pt; font-weight: 700; letter-spacing: .03em; }
+  #uzdi-informe-impresion h1 { font-size: 19pt; margin: 6px 0 4px; color: #fff !important; }
+  #uzdi-informe-impresion .informe-cabecera p { font-size: 9pt; margin: 0; }
+  #uzdi-informe-impresion .informe-metadatos {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 1px solid #d1d9e6; padding: 12px; gap: 7px 12px; margin-bottom: 20px;
+  }
+  #uzdi-informe-impresion h2 {
+    font-size: 12.5pt; color: #243c79 !important; margin: 18px 0 9px;
+    break-after: avoid;
+  }
+  #uzdi-informe-impresion .informe-tabla {
+    border-collapse: collapse; width: 100%; font-size: 9pt; table-layout: auto;
+  }
+  #uzdi-informe-impresion .informe-tabla th {
+    color: #fff !important; background: #2b4170 !important;
+    border: 1px solid #2b4170; text-align: left; padding: 8px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  #uzdi-informe-impresion .informe-tabla td {
+    border: 1px solid #d1d9e6; padding: 7px 8px; vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  #uzdi-informe-impresion .informe-tabla tr { break-inside: avoid; }
+  #uzdi-informe-impresion .informe-tabla thead { display: table-header-group; }
+  #uzdi-informe-impresion .informe-tabla .num { text-align: right; width: 16%; }
+  #uzdi-informe-impresion .informe-metodologia {
+    margin-top: 20px; font-size: 8.5pt; color: #4b5563;
+    border-top: 1px solid #d1d9e6; padding-top: 10px;
+  }
+  #uzdi-informe-impresion .informe-pie { color: #64748b; font-size: 8pt; margin-top: 14px; text-align: center; }
+}
+</style>
