@@ -101,8 +101,9 @@ export async function opcionesDe(fuente: RefSource): Promise<Opcion[]> {
     const opciones = await cargarFuente(fuente)
     cache.set(fuente, opciones)
     return opciones
-  } catch {
-    return []
+  } catch (error) {
+    // Una consulta fallida (403/500/red) no equivale a un catálogo vacío.
+    throw new Error(`No se pudo cargar el catálogo ${fuente}. Revise la conexión y los permisos.`, { cause: error })
   }
 }
 
