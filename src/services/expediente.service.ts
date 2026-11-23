@@ -8,88 +8,61 @@ export interface ExpedienteAdolescenteRef {
   apellido: string
   cedula: string
 }
+
 export interface ExpedienteCatRef {
   id: number
   nombre: string
 }
 
-// DDL: el expediente enlaza adolescente + infracción + medida + uzdi con estado y fechas.
+/** Contrato real DDL v8: las medidas viven en /medida-expediente. */
 export interface ExpedienteDto {
   id?: number
-  estado: string
-  num_causa: string
-  juzgado: string
-  defensor: string
-  fecha_apertura: string
-  fecha_cierre?: string | null
-  observaciones?: string
-  fecha_inicio_medida: string
-  fecha_fin_medida?: string | null
   adlc_id?: number
   uzdi_id?: number
   infc_id?: number
-  mdso_id?: number
+  numero_causa?: string | null
+  estado_procesal: 'En proceso' | 'Atraso' | 'Incomparecencia' | 'Concluido' | 'Archivado'
+  observaciones?: string | null
+  estado?: boolean
   adolescente?: ExpedienteAdolescenteRef
   uzdi?: ExpedienteCatRef
   infraccion?: ExpedienteCatRef
-  medida?: ExpedienteCatRef
 }
 
 export interface ExpedientePayload {
   adlc_id: number
   uzdi_id: number
   infc_id: number
-  mdso_id: number
-  estado: string
-  num_causa: string
-  juzgado: string
-  defensor: string
-  fecha_apertura: string
-  fecha_cierre?: string
+  numero_causa?: string
+  estado_procesal?: ExpedienteDto['estado_procesal']
   observaciones?: string
-  fecha_inicio_medida: string
-  fecha_fin_medida?: string
+  estado?: boolean
 }
 
 function toTono(estado: string): string {
   const map: Record<string, string> = {
-    'En proceso': 'green', 'Atraso': 'amber', 'Incomparecencia': 'red', 'Cerrado': 'slate',
+    'En proceso': 'green', Atraso: 'amber', Incomparecencia: 'red',
+    Concluido: 'slate', Archivado: 'slate',
   }
   return map[estado] ?? 'slate'
-}
-
-function formatDate(iso?: string | null): string {
-  if (!iso) return '—'
-  const [y, m, d] = iso.substring(0, 10).split('-')
-  return `${d}/${m}/${y}`
 }
 
 export const expedienteService = {
   async getAll() {
     const { data } = await api.get<ExpedienteDto[]>(ENDPOINTS.expediente)
-    return listaDe<ExpedienteDto>(data).map((e) => {
-      const anio = (e.fecha_inicio_medida ?? '').substring(0, 4) || String(new Date().getFullYear())
-      return {
-        id: e.id!,
-        codigo: `EXP-${anio}-${String(e.id!).padStart(4, '0')}`,
-        causa: e.num_causa || '—',
-        adol: e.adolescente ? `${e.adolescente.nombre} ${e.adolescente.apellido}` : '—',
-        ced: e.adolescente?.cedula ?? '—',
-        infraccion: e.infraccion?.nombre ?? '—',
-        juzgado: e.juzgado || '—',
-        defensor: e.defensor || '—',
-        observaciones: e.observaciones || '',
-        medida: e.medida?.nombre ?? '—',
-        uzdi: e.uzdi?.nombre ?? '—',
-        apertura: formatDate(e.fecha_apertura),
-        cierre: formatDate(e.fecha_cierre),
-        inicio: formatDate(e.fecha_inicio_medida),
-        fin: formatDate(e.fecha_fin_medida),
-        estado: e.estado,
-        tono: toTono(e.estado),
-        _raw: e,
-      }
-    })
+    return listaDe<ExpedienteDto>(data).map((e) => ({
+      id: e.id!,
+      codigo: `EXP-${String(e.id!).padStart(4, '0')}`,
+      causa: e.numero_causa || '—',
+      adol: e.adolescente ? `${e.adolescente.nombre} ${e.adolescente.apellido}` : '—',
+      ced: e.adolescente?.cedula ?? '—',
+      infraccion: e.infraccion?.nombre ?? '—',
+      uzdi: e.uzdi?.nombre ?? '—',
+      estado: e.estado_procesal,
+      tono: toTono(e.estado_procesal),
+      observaciones: e.observaciones ?? '',
+      _raw: e,
+    }))
   },
 
   async create(payload: ExpedientePayload) {

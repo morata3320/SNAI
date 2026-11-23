@@ -8,7 +8,8 @@ import { ENDPOINTS } from '../services/backend-contract'
 export type RefSource =
   | 'adolescentes' | 'representantes' | 'expedientes' | 'talleres'
   | 'medidas' | 'uzdis' | 'usuarios' | 'provincias' | 'cantones'
-  | 'gdos' | 'perfiles' | 'infracciones'
+  | 'gdos' | 'perfiles' | 'infracciones' | 'tiposParentesco'
+  | 'tiposDocumento'
 
 export interface Opcion {
   value: number | string
@@ -80,6 +81,14 @@ async function cargarFuente(fuente: RefSource): Promise<Opcion[]> {
     case 'infracciones': {
       const filas = await catalogoService.infracciones()
       return filas.map((i) => ({ value: i.id, label: i.nombre }))
+    }
+    case 'tiposParentesco': {
+      const filas = await createCrudService<Row, Record<string, unknown>>(ENDPOINTS.tipoParentesco).getAll()
+      return filas.map((p) => ({ value: p.id, label: refNombre(p) }))
+    }
+    case 'tiposDocumento': {
+      const filas = await createCrudService<Row, Record<string, unknown>>(ENDPOINTS.tipoDocumento).getAll()
+      return filas.map((t) => ({ value: t.id, label: refNombre(t) }))
     }
   }
 }

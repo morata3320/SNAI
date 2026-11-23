@@ -7,10 +7,8 @@ import {
   ESTADOS_EDUCATIVOS,
   EJES_ATENCION,
   NIVELES_EDUCATIVOS,
-  PARENTESCOS,
   TEMAS_TALLER,
   TIPOS_ALERTA_SALUD,
-  TIPOS_DOCUMENTO,
   TIPOS_FICHA_PSICOLOGICA,
 } from '../config/pendientes'
 import {
@@ -98,7 +96,7 @@ function siNo(valor: unknown): string {
 }
 
 function badgeActivo(row: Registro): TonoBadge {
-  return row.activo === false ? 'slate' : 'green'
+  return row.activo === false || row.estado === false ? 'slate' : 'green'
 }
 
 function badgeEstado(verde: string[], ambar: string[], rojo: string[]) {
@@ -119,7 +117,7 @@ const validarFin = (v: unknown, form: Record<string, unknown>): string =>
     ? ''
     : 'La fecha de fin no puede ser anterior a la fecha de inicio.'
 
-const campoActivo: ColumnaDef = { key: 'activo', label: 'Estado', value: (r) => (r.activo === false ? 'Inactivo' : 'Activo'), badge: badgeActivo }
+const campoActivo: ColumnaDef = { key: 'activo', label: 'Estado', value: (r) => (r.activo === false || r.estado === false ? 'Inactivo' : 'Activo'), badge: badgeActivo }
 
 // ── Gestión: GDO (RF-04) ───────────────────────────────────────
 export const GDO: ModuloDef = {
@@ -151,17 +149,18 @@ export const REPRESENTANTE: ModuloDef = {
   singular: 'el representante',
   bajaLabel: 'Desactivar representante',
   bajaAviso: 'El representante y sus vínculos dejarán de ofrecerse; el historial se conserva.',
-  searchKeys: ['nombres', 'apellidos', 'telefono', 'direccion'],
+  searchKeys: ['nombre', 'apellido', 'cedula', 'telefono', 'direccion'],
   fields: [
-    { key: 'nombres', label: 'Nombres', required: true },
-    { key: 'apellidos', label: 'Apellidos', required: true },
-    { key: 'parentesco', label: 'Parentesco', type: 'select', options: PARENTESCOS, required: true },
-    { key: 'telefono', label: 'Teléfono', type: 'tel', required: true, validate: validarTelefono },
-    { key: 'direccion', label: 'Dirección', required: true, ancho: 'full' },
+    { key: 'cntn_id', label: 'Cantón', type: 'ref', ref: 'cantones', required: true },
+    { key: 'nombre', label: 'Nombres', required: true },
+    { key: 'apellido', label: 'Apellidos', required: true },
+    { key: 'cedula', label: 'Cédula o documento', required: true },
+    { key: 'telefono', label: 'Teléfono', type: 'tel', validate: validarTelefono },
+    { key: 'direccion', label: 'Dirección', ancho: 'full' },
   ],
   columns: [
-    { key: 'nombres', label: 'Representante', value: (r) => `${texto(r, 'nombres')} ${texto(r, 'apellidos')}` },
-    { key: 'parentesco', label: 'Parentesco', value: (r) => texto(r, 'parentesco') },
+    { key: 'nombre', label: 'Representante', value: (r) => `${texto(r, 'nombre')} ${texto(r, 'apellido')}` },
+    { key: 'cedula', label: 'Documento', value: (r) => texto(r, 'cedula') },
     { key: 'telefono', label: 'Teléfono', value: (r) => texto(r, 'telefono') },
     { key: 'adolescentes', label: 'Adolescentes vinculados', value: (r) => {
       const lista = r['adolescentes']
@@ -182,15 +181,17 @@ export const VINCULO: ModuloDef = {
   searchKeys: [],
   fields: [
     { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true },
-    { key: 'representante_id', label: 'Representante', type: 'ref', ref: 'representantes', required: true },
-    { key: 'parentesco', label: 'Parentesco', type: 'select', options: PARENTESCOS, required: true },
-    { key: 'principal', label: 'Representante principal', type: 'checkbox' },
+    { key: 'repr_id', label: 'Representante', type: 'ref', ref: 'representantes', required: true },
+    { key: 'tprt_id', label: 'Tipo de parentesco', type: 'ref', ref: 'tiposParentesco', required: true },
+    { key: 'es_referente', label: 'Representante principal', type: 'checkbox' },
+    { key: 'fecha_inicio', label: 'Fecha de inicio', type: 'date' },
+    { key: 'fecha_fin', label: 'Fecha de fin', type: 'date', validate: validarFin },
   ],
   columns: [
     { key: 'adolescente', label: 'Adolescente', value: (r) => refTexto(r, 'adolescente') },
     { key: 'representante', label: 'Representante', value: (r) => refTexto(r, 'representante') },
-    { key: 'parentesco', label: 'Parentesco', value: (r) => texto(r, 'parentesco') },
-    { key: 'principal', label: 'Principal', value: (r) => siNo(r['principal']) },
+    { key: 'tipoParentesco', label: 'Parentesco', value: (r) => refTexto(r, 'tipoParentesco') },
+    { key: 'es_referente', label: 'Principal', value: (r) => siNo(r['es_referente']) },
     campoActivo,
   ],
 }
@@ -277,6 +278,8 @@ export const TALLER: ModuloDef = {
   bajaLabel: 'Desactivar taller',
   searchKeys: ['nombre', 'tema', 'objetivo', 'lugar', 'institucion'],
   fields: [
+    { key: 'uzdi_id', label: 'UZDI', type: 'ref', ref: 'uzdis', required: true },
+    { key: 'prsn_id', label: 'Profesional responsable', type: 'ref', ref: 'usuarios', required: true },
     { key: 'nombre', label: 'Nombre del taller', required: true },
     { key: 'tema', label: 'Tema', type: 'select', options: TEMAS_TALLER, required: true },
     { key: 'objetivo', label: 'Objetivo', type: 'textarea', ancho: 'full' },
@@ -285,7 +288,7 @@ export const TALLER: ModuloDef = {
     { key: 'hora_fin', label: 'Hora de fin', type: 'time', required: true,
       validate: (v, form) => String(v) > String(form.hora_inicio ?? '') ? '' : 'La hora de fin debe ser posterior a la de inicio.' },
     { key: 'lugar', label: 'Lugar', required: true },
-    { key: 'institucion', label: 'Institución cooperante' },
+    { key: 'observaciones', label: 'Observaciones', type: 'textarea', ancho: 'full' },
   ],
   columns: [
     { key: 'fecha', label: 'Fecha', value: (r) => fecha(r, 'fecha') },
@@ -305,16 +308,17 @@ export const ASISTENCIA_TALLER: ModuloDef = {
   singular: 'la asistencia',
   searchKeys: [],
   fields: [
-    { key: 'taller_id', label: 'Taller', type: 'ref', ref: 'talleres', required: true },
+    { key: 'tall_id', label: 'Taller', type: 'ref', ref: 'talleres', required: true },
+    { key: 'tipo_asistente', label: 'Tipo de asistente', type: 'select', options: ['adolescente', 'representante'], required: true },
     { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true },
-    { key: 'asistencia_adolescente', label: 'Asistió el adolescente', type: 'checkbox' },
-    { key: 'asistencia_representante', label: 'Asistió el representante', type: 'checkbox' },
+    { key: 'asistio', label: 'Asistió', type: 'checkbox' },
+    { key: 'observaciones', label: 'Observaciones', type: 'textarea', ancho: 'full' },
   ],
   columns: [
     { key: 'taller', label: 'Taller', value: (r) => refTexto(r, 'taller') },
     { key: 'adolescente', label: 'Adolescente', value: (r) => refTexto(r, 'adolescente') },
-    { key: 'asistencia_adolescente', label: 'Adolescente', value: (r) => siNo(r['asistencia_adolescente']) },
-    { key: 'asistencia_representante', label: 'Representante', value: (r) => siNo(r['asistencia_representante']) },
+    { key: 'tipo_asistente', label: 'Tipo', value: (r) => texto(r, 'tipo_asistente') },
+    { key: 'asistio', label: 'Asistencia', value: (r) => siNo(r['asistio']) },
   ],
 }
 
@@ -353,25 +357,26 @@ export const DOCUMENTO: ModuloDef = {
   singular: 'el documento',
   bajaLabel: 'Archivar documento',
   bajaAviso: 'El documento se archiva y se conserva; no se elimina del historial.',
-  searchKeys: ['numero', 'emisor', 'contenido'],
+  searchKeys: ['numero_documento', 'emisor', 'observaciones'],
   aviso: 'Información jurídica confidencial. En esta versión no se adjuntan archivos.',
   fields: [
-    { key: 'tipo', label: 'Tipo', type: 'select', options: TIPOS_DOCUMENTO, required: true },
-    { key: 'numero', label: 'Número', required: true },
-    { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true },
-    { key: 'expediente_id', label: 'Expediente', type: 'ref', ref: 'expedientes' },
-    { key: 'emisor', label: 'Emisor', required: true },
-    { key: 'fecha_registro', label: 'Fecha de registro', type: 'date', required: true },
-    { key: 'estado', label: 'Estado', type: 'select', options: ['Vigente', 'Archivado'], required: true },
-    { key: 'contenido', label: 'Contenido', type: 'textarea', ancho: 'full' },
+    { key: 'expe_id', label: 'Expediente', type: 'ref', ref: 'expedientes', required: true },
+    { key: 'prsn_id', label: 'Profesional que registra', type: 'ref', ref: 'usuarios', required: true },
+    { key: 'tpdc_id', label: 'Tipo de documento', type: 'ref', ref: 'tiposDocumento', required: true },
+    { key: 'es_habilitante', label: 'Documento habilitante', type: 'checkbox' },
+    { key: 'estado_tramite', label: 'Estado del trámite', type: 'select', options: ['pendiente', 'recibido', 'verificado', 'no aplica', 'rechazado'], required: true },
+    { key: 'numero_documento', label: 'Número del documento' },
+    { key: 'fecha_documento', label: 'Fecha del documento', type: 'date' },
+    { key: 'emisor', label: 'Emisor' },
+    { key: 'observaciones', label: 'Observaciones', type: 'textarea', ancho: 'full' },
   ],
   columns: [
-    { key: 'fecha_registro', label: 'Fecha', value: (r) => fecha(r, 'fecha_registro') },
-    { key: 'tipo', label: 'Tipo', value: (r) => texto(r, 'tipo') },
-    { key: 'numero', label: 'Número', value: (r) => texto(r, 'numero') },
-    { key: 'adolescente', label: 'Adolescente', value: (r) => refTexto(r, 'adolescente') },
-    { key: 'estado', label: 'Estado', value: (r) => texto(r, 'estado'),
-      badge: badgeEstado(['Vigente'], [], ['Archivado']) },
+    { key: 'fecha_documento', label: 'Fecha', value: (r) => fecha(r, 'fecha_documento') },
+    { key: 'tipo_documento', label: 'Tipo', value: (r) => refTexto(r, 'tipo_documento') },
+    { key: 'numero_documento', label: 'Número', value: (r) => texto(r, 'numero_documento') },
+    { key: 'expediente', label: 'Expediente', value: (r) => refTexto(r, 'expediente') },
+    { key: 'estado_tramite', label: 'Estado', value: (r) => texto(r, 'estado_tramite'),
+      badge: badgeEstado(['recibido', 'verificado'], ['pendiente'], ['rechazado']) },
   ],
 }
 
@@ -391,7 +396,6 @@ export const ALERTA_SALUD: ModuloDef = {
     { key: 'tipo', label: 'Tipo de alerta', type: 'select', options: TIPOS_ALERTA_SALUD, required: true },
     { key: 'fecha', label: 'Fecha', type: 'date', required: true },
     { key: 'estado', label: 'Estado', type: 'select', options: ESTADOS_ALERTA_SALUD, required: true },
-    { key: 'descripcion', label: 'Descripción', type: 'textarea', ancho: 'full' },
   ],
   columns: [
     { key: 'fecha', label: 'Fecha', value: (r) => fecha(r, 'fecha') },
@@ -446,7 +450,6 @@ export const MEDIDA: ModuloDef = {
   columns: [
     { key: 'nombre', label: 'Medida', value: (r) => texto(r, 'nombre') },
     { key: 'duracion_meses', label: 'Duración (meses)', value: (r) => texto(r, 'duracion_meses'), align: 'center' },
-    { key: 'descripcion', label: 'Descripción', value: (r) => texto(r, 'descripcion') },
     campoActivo,
   ],
 }
@@ -459,21 +462,21 @@ export const ASIGNACION_MEDIDA: ModuloDef = {
   singular: 'la asignación de medida',
   searchKeys: ['detalle', 'estado'],
   fields: [
-    { key: 'adlc_id', label: 'Adolescente', type: 'ref', ref: 'adolescentes', required: true },
-    { key: 'expediente_id', label: 'Expediente', type: 'ref', ref: 'expedientes', required: true },
+    { key: 'expe_id', label: 'Expediente', type: 'ref', ref: 'expedientes', required: true },
     { key: 'mdso_id', label: 'Medida', type: 'ref', ref: 'medidas', required: true },
+    { key: 'orden', label: 'Orden de cumplimiento', type: 'number', required: true },
     { key: 'fecha_inicio', label: 'Fecha de inicio', type: 'date', required: true },
-    { key: 'fecha_fin', label: 'Fecha de fin estimada', type: 'date', required: true, validate: validarFin },
-    { key: 'estado', label: 'Estado de cumplimiento', type: 'select', options: ['En curso', 'Cumplida', 'Incumplida'], required: true },
-    { key: 'detalle', label: 'Detalle de cumplimiento', type: 'textarea', ancho: 'full' },
+    { key: 'fecha_fin', label: 'Fecha de fin estimada', type: 'date', validate: validarFin },
+    { key: 'estado_cumplimiento', label: 'Estado de cumplimiento', type: 'select', options: ['En proceso', 'Cumplida', 'Incumplida', 'Sustituida', 'Suspendida'] },
+    { key: 'observaciones', label: 'Detalle de cumplimiento', type: 'textarea', ancho: 'full' },
   ],
   columns: [
-    { key: 'adolescente', label: 'Adolescente', value: (r) => refTexto(r, 'adolescente') },
+    { key: 'expediente', label: 'Expediente', value: (r) => refTexto(r, 'expediente') },
     { key: 'medida', label: 'Medida', value: (r) => refTexto(r, 'medida') },
     { key: 'fecha_inicio', label: 'Inicio', value: (r) => fecha(r, 'fecha_inicio') },
     { key: 'fecha_fin', label: 'Fin', value: (r) => fecha(r, 'fecha_fin') },
-    { key: 'estado', label: 'Estado', value: (r) => texto(r, 'estado'),
-      badge: badgeEstado(['Cumplida'], ['En curso'], ['Incumplida']) },
+    { key: 'estado_cumplimiento', label: 'Estado', value: (r) => texto(r, 'estado_cumplimiento'),
+      badge: badgeEstado(['Cumplida'], ['En proceso'], ['Incumplida']) },
   ],
 }
 
@@ -490,8 +493,7 @@ export const UZDI: ModuloDef = {
   fields: [
     { key: 'nombre', label: 'Nombre', required: true },
     { key: 'zona', label: 'Zona', required: true },
-    { key: 'provincia_id', label: 'Provincia', type: 'ref', ref: 'provincias' },
-    { key: 'cntn_id', label: 'Cantón', type: 'ref', ref: 'cantones' },
+    { key: 'cntn_id', label: 'Cantón', type: 'ref', ref: 'cantones', required: true },
     { key: 'direccion', label: 'Dirección', ancho: 'full' },
     { key: 'telefono', label: 'Teléfono', type: 'tel', validate: validarTelefono },
     { key: 'correo', label: 'Correo institucional', type: 'email' },
@@ -516,6 +518,7 @@ export const PERFIL: ModuloDef = {
   bajaAviso: 'El perfil dejará de asignarse a nuevos usuarios; los usuarios actuales conservan su acceso.',
   searchKeys: ['nombre', 'descripcion'],
   fields: [
+    { key: 'codigo', label: 'Código (2 a 5 letras)', required: true },
     { key: 'nombre', label: 'Nombre del perfil', required: true },
     { key: 'descripcion', label: 'Descripción', type: 'textarea', ancho: 'full' },
   ],
@@ -545,7 +548,7 @@ function catalogo(id: ModuleId, path: string, title: string, singular: string, c
 
 export const PROVINCIA = catalogo('catalogos', ENDPOINTS.provincia, 'Provincias', 'la provincia')
 export const CANTON = catalogo('catalogos', ENDPOINTS.canton, 'Cantones', 'el cantón',
-  [{ key: 'provincia_id', label: 'Provincia', type: 'ref', ref: 'provincias', required: true }],
+  [{ key: 'prov_id', label: 'Provincia', type: 'ref', ref: 'provincias', required: true }],
   [{ key: 'provincia', label: 'Provincia', value: (r) => refTexto(r, 'provincia') }])
 export const NACIONALIDAD = catalogo('catalogos', ENDPOINTS.nacionalidad, 'Nacionalidades', 'la nacionalidad')
 export const ESTADO_CIVIL = catalogo('catalogos', ENDPOINTS.estadoCivil, 'Estados civiles', 'el estado civil')

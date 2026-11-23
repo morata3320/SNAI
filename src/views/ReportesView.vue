@@ -35,12 +35,20 @@ interface TallerRow {
   activo?: boolean
 }
 interface AsistenciaRow {
-  taller_id: number
-  adlc_id: number
-  asistencia_adolescente: boolean
-  asistencia_representante: boolean
+  tall_id: number
+  tipo_asistente: 'adolescente' | 'representante'
+  asistio: boolean
   uzdi_id?: number
-  activo?: boolean
+  estado?: boolean
+}
+interface MedidaExpedienteRow {
+  id: number
+  expe_id: number
+  fecha_inicio: string
+  fecha_fin?: string | null
+  estado_cumplimiento?: string
+  estado?: boolean
+  medida?: { nombre?: string }
 }
 
 const adolescentes = ref<AdolRow[]>([])
@@ -48,6 +56,7 @@ const expedientes  = ref<ExpeRow[]>([])
 const representantes = ref<RepresentanteRow[]>([])
 const talleres = ref<TallerRow[]>([])
 const asistencias = ref<AsistenciaRow[]>([])
+const medidasExpediente = ref<MedidaExpedienteRow[]>([])
 const loadingData  = ref(true)
 const generated    = ref(false)
 const errorCarga   = ref('')
@@ -124,9 +133,17 @@ async function cargarDatosOpcionales() {
         api.get<AsistenciaRow[]>(ENDPOINTS.asistenciaTaller),
       ])
       talleres.value = listaDe<TallerRow>(t.data).filter(x => x.activo !== false)
-      asistencias.value = listaDe<AsistenciaRow>(a.data).filter(x => x.activo !== false)
+      asistencias.value = listaDe<AsistenciaRow>(a.data).filter(x => x.estado !== false)
     } catch {
       errorCarga.value = 'No se pudieron cargar los talleres y asistencias para el reporte de participación.'
+    }
+  }
+  if (tipos.some(t => ['Medidas socioeducativas', 'Expedientes', 'Revisiones y seguimiento', 'Estadístico general'].includes(t))) {
+    try {
+      const { data } = await api.get<MedidaExpedienteRow[]>(ENDPOINTS.medidaExpediente)
+      medidasExpediente.value = listaDe<MedidaExpedienteRow>(data).filter(x => x.estado !== false)
+    } catch {
+      errorCarga.value = 'No se pudieron cargar las medidas de los expedientes para completar los indicadores.'
     }
   }
 }
@@ -193,10 +210,7 @@ const adolescentesFiltrados = computed(() =>
   adolescentes.value.filter(a => coincideZona(a._raw.uzdi_id) && enRango(a._raw.fecha_ingr))
 )
 const expedientesFiltrados = computed(() =>
-  expedientes.value.filter(e =>
-    coincideZona(e._raw.uzdi_id) &&
-    enRango(e._raw.fecha_apertura || e._raw.fecha_inicio_medida)
-  )
+  expedientes.value.filter(e => coincideZona(e._raw.uzdi_id))
 )
 const representantesFiltrados = computed(() =>
   representantes.value.filter(r => coincideZona(r.uzdi_id) && enRango(r.creado_en))
@@ -271,7 +285,9 @@ const reporteData = computed(() => {
   const conAlerta = expes.filter(e => e.estado === 'Atraso' || e.estado === 'Incomparecencia').length
   const atrasos   = expes.filter(e => e.estado === 'Atraso').length
   const incompar  = expes.filter(e => e.estado === 'Incomparecencia').length
-  const conFin    = expes.filter(e => !!e._raw.fecha_fin_medida)
+  const expedientesIds = new Set(expes.map(e => e.id))
+  const medidas = medidasExpediente.value.filter(m => expedientesIds.has(m.expe_id) && enRango(m.fecha_inicio))
+  const conFin = medidas.filter(m => !!m.fecha_fin)
   const tipo = form.tipo || tiposDisponibles.value[0] || 'Estadístico general'
 
   if (tipo === 'Estadístico general') {
@@ -315,7 +331,10 @@ const reporteData = computed(() => {
 
   if (tipo === 'Medidas socioeducativas') {
     const counts: Record<string, number> = {}
-    for (const e of expes) { const m = e.medida || 'Sin medida'; counts[m] = (counts[m] ?? 0) + 1 }
+    for (const asignacion of medidas) {
+      const nombre = asignacion.medida?.nombre || 'Medida sin nombre'
+      counts[nombre] = (counts[nombre] ?? 0) + 1
+    }
     const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6)
     return {
       stats: [
@@ -329,9 +348,9 @@ const reporteData = computed(() => {
   }
 
   if (tipo === 'Expedientes') {
-    const vencen7  = conFin.filter(e => { const d = diasHasta(e._raw.fecha_fin_medida!); return d >= 0 && d <= 7 }).length
-    const vencen30 = conFin.filter(e => { const d = diasHasta(e._raw.fecha_fin_medida!); return d >= 0 && d <= 30 }).length
-    const vencidos = conFin.filter(e => diasHasta(e._raw.fecha_fin_medida!) < 0).length
+    const vencen7  = conFin.filter(m => { const d = diasHasta(m.fecha_fin!); return d >= 0 && d <= 7 }).length
+    const vencen30 = conFin.filter(m => { const d = diasHasta(m.fecha_fin!); return d >= 0 && d <= 30 }).length
+    const vencidos = conFin.filter(m => diasHasta(m.fecha_fin!) < 0).length
     return {
       stats: [
         { color: 'green', num: String(expes.length), label: 'Total expedientes'   },
@@ -388,14 +407,14 @@ const reporteData = computed(() => {
 
   if (tipo === 'Participación en talleres') {
     const tallerIds = new Set(talleresFiltrados.value.map(t => t.id))
-    const asis = asistencias.value.filter(a => tallerIds.has(a.taller_id) && coincideZona(a.uzdi_id))
-    const adolSi = asis.filter(a => a.asistencia_adolescente).length
-    const repSi = asis.filter(a => a.asistencia_representante).length
+    const asis = asistencias.value.filter(a => tallerIds.has(a.tall_id) && coincideZona(a.uzdi_id))
+    const adolSi = asis.filter(a => a.tipo_asistente === 'adolescente' && a.asistio).length
+    const repSi = asis.filter(a => a.tipo_asistente === 'representante' && a.asistio).length
     const filas = talleresFiltrados.value.map(t => {
-      const propias = asis.filter(a => a.taller_id === t.id)
+      const propias = asis.filter(a => a.tall_id === t.id)
       return {
         indicador: `${t.nombre} (${t.fecha})`,
-        valor: propias.filter(a => a.asistencia_adolescente).length,
+        valor: propias.filter(a => a.tipo_asistente === 'adolescente' && a.asistio).length,
       }
     })
     return {
@@ -409,9 +428,9 @@ const reporteData = computed(() => {
     }
   }
 
-  const vencen7  = conFin.filter(e => { const d = diasHasta(e._raw.fecha_fin_medida!); return d >= 0 && d <= 7 }).length
-  const vencen30 = conFin.filter(e => { const d = diasHasta(e._raw.fecha_fin_medida!); return d >= 0 && d <= 30 }).length
-  const vencidos = conFin.filter(e => diasHasta(e._raw.fecha_fin_medida!) < 0).length
+  const vencen7  = conFin.filter(m => { const d = diasHasta(m.fecha_fin!); return d >= 0 && d <= 7 }).length
+  const vencen30 = conFin.filter(m => { const d = diasHasta(m.fecha_fin!); return d >= 0 && d <= 30 }).length
+  const vencidos = conFin.filter(m => diasHasta(m.fecha_fin!) < 0).length
   return {
     stats: [
       { color: 'amber', num: String(vencen7),       label: 'Vencen en 7 días'      },

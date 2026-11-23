@@ -20,6 +20,13 @@ interface TallerRow { id: number; nombre: string; fecha: string; activo?: boolea
 interface AlertaRow { id: number; estado: string; activo?: boolean }
 interface AsignacionRow { id: number; expediente_id: number; activo?: boolean }
 interface BitacoraRow { id: number; fecha: string; tipo: string; detalle: string }
+interface MedidaExpedienteRow {
+  id: number
+  expe_id: number
+  fecha_fin?: string | null
+  estado_cumplimiento?: string
+  medida?: { nombre?: string }
+}
 
 const router = useRouter()
 const { user } = useAuth()
@@ -37,6 +44,7 @@ const talleres = ref<TallerRow[]>([])
 const alertas = ref<AlertaRow[]>([])
 const asignaciones = ref<AsignacionRow[]>([])
 const bitacora = ref<BitacoraRow[]>([])
+const medidasExpediente = ref<MedidaExpedienteRow[]>([])
 
 const rol = computed(() => roleKey((user.value?.['tppr_id'] as number | undefined) ?? null))
 const puedeVerExpedientes = computed(() => visible('expedientes'))
@@ -48,6 +56,9 @@ async function cargarPanel() {
   }
   if (visible('expedientes')) {
     tareas.push(expedienteService.getAll().then(rows => { expedientes.value = rows }))
+    tareas.push(api.get<MedidaExpedienteRow[]>(ENDPOINTS.medidaExpediente).then(({ data }) => {
+      medidasExpediente.value = listaDe<MedidaExpedienteRow>(data)
+    }))
   }
   if (visible('fichas')) {
     tareas.push(api.get<FichaRow[]>('/ficha-psicologica').then(({ data }) => {
@@ -194,11 +205,11 @@ const stats = computed<StatCard[]>(() => {
   return items
 })
 
-// Bar chart: expedientes agrupados por tipo de medida
+// Bar chart: asignaciones reales agrupadas por tipo de medida.
 const barData = computed(() => {
   const counts: Record<string, number> = {}
-  for (const e of expedientes.value) {
-    const name = e.medida || 'Sin medida'
+  for (const asignacion of medidasExpediente.value) {
+    const name = asignacion.medida?.nombre || 'Medida sin nombre'
     counts[name] = (counts[name] ?? 0) + 1
   }
   return Object.entries(counts)
@@ -214,20 +225,18 @@ const donutData = computed(() => [
   { l: 'Incomparecencia', v: expedientes.value.filter(e => e.estado === 'Incomparecencia').length, c: '#dc2626' },
 ].filter(d => d.v > 0))
 
-// Revisiones: expedientes con fecha_fin_medida, ordenados por fecha más próxima
+// Revisiones: fechas de fin del recurso /medida-expediente.
 const revisionData = computed(() =>
-  [...expedientes.value]
-    .filter(e => e._raw.fecha_fin_medida)
-    .sort((a, b) =>
-      new Date(a._raw.fecha_fin_medida!).getTime() - new Date(b._raw.fecha_fin_medida!).getTime()
-    )
+  [...medidasExpediente.value]
+    .filter(m => m.fecha_fin)
+    .sort((a, b) => new Date(a.fecha_fin!).getTime() - new Date(b.fecha_fin!).getTime())
     .slice(0, 5)
-    .map(e => ({
-      adol:   e.adol,
-      medida: e.medida,
-      fin:    e.fin,
-      estado: e.estado,
-      tono:   e.tono,
+    .map(m => ({
+      adol: `Expediente #${m.expe_id}`,
+      medida: m.medida?.nombre ?? 'Medida sin nombre',
+      fin: m.fecha_fin ?? '—',
+      estado: m.estado_cumplimiento ?? 'En proceso',
+      tono: m.estado_cumplimiento === 'Incumplida' ? 'red' : m.estado_cumplimiento === 'Cumplida' ? 'green' : 'amber',
     }))
 )
 </script>
@@ -259,7 +268,8 @@ const revisionData = computed(() =>
       </div>
     </div>
 
-    <!-- Stat cards por rol -->
+    <template v-if="!errorCarga">
+    <!-- Stat cards por rol. Se ocultan si hubo fallos para no presentar ceros engañosos. -->
     <div class="stat-grid">
       <div
         v-for="s in stats" :key="s.label"
@@ -292,5 +302,6 @@ const revisionData = computed(() =>
       <RevisionListCard v-if="puedeVerExpedientes" :items="revisionData" />
       <QuickAccessCard />
     </div>
+    </template>
   </template>
 </template>

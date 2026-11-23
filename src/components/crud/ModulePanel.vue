@@ -185,7 +185,7 @@ async function guardarFormulario(): Promise<void> {
             <Pencil :size="16" />
           </button>
           <button
-            v-if="puedeBaja && row.activo !== false"
+            v-if="puedeBaja && row.activo !== false && row.estado !== false"
             class="ico-btn danger"
             type="button"
             :title="def.bajaLabel ?? 'Desactivar'"
