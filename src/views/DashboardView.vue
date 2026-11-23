@@ -14,6 +14,7 @@ import QuickAccessCard   from '../components/dashboard/QuickAccessCard.vue'
 import api from '../services/api'
 import { ENDPOINTS } from '../services/backend-contract'
 import { listaDe } from '../services/response'
+import { catalogoService } from '../services/catalogo.service'
 
 interface FichaRow { id: number; fecha: string; activo?: boolean }
 interface TallerRow { id: number; nombre: string; fecha: string; activo?: boolean }
@@ -45,6 +46,46 @@ const alertas = ref<AlertaRow[]>([])
 const asignaciones = ref<AsignacionRow[]>([])
 const bitacora = ref<BitacoraRow[]>([])
 const medidasExpediente = ref<MedidaExpedienteRow[]>([])
+
+// Catálogos reales del backend: no son registros simulados de adolescentes.
+interface ResumenCatalogo {
+  nombre: string
+  registros: string[]
+}
+const catalogosInstitucionales = ref<ResumenCatalogo[]>([])
+const cargandoCatalogos = ref(true)
+const errorCatalogos = ref(false)
+const fuentesInstitucionales: { nombre: string; cargar: () => Promise<{ nombre: string }[]> }[] = [
+  { nombre: 'Provincias', cargar: catalogoService.provincias },
+  { nombre: 'Cantones', cargar: catalogoService.cantones },
+  { nombre: 'Unidades UZDI', cargar: catalogoService.uzdis },
+  { nombre: 'Nacionalidades', cargar: catalogoService.nacionalidades },
+  { nombre: 'Estados civiles', cargar: catalogoService.estadosCiviles },
+  { nombre: 'Etnias', cargar: catalogoService.etnias },
+  { nombre: 'GDO', cargar: catalogoService.gdos },
+  { nombre: 'Infracciones', cargar: catalogoService.infracciones },
+  { nombre: 'Medidas socioeducativas', cargar: catalogoService.medidas },
+]
+
+async function cargarCatalogosInstitucionales(): Promise<void> {
+  cargandoCatalogos.value = true
+  try {
+    const resultados = await Promise.allSettled(
+      fuentesInstitucionales.map((fuente) => fuente.cargar()),
+    )
+    catalogosInstitucionales.value = resultados.flatMap((resultado, indice) =>
+      resultado.status === 'fulfilled'
+        ? [{
+          nombre: fuentesInstitucionales[indice]!.nombre,
+          registros: resultado.value.map((fila) => fila.nombre),
+        }]
+        : [],
+    )
+    errorCatalogos.value = resultados.some((resultado) => resultado.status === 'rejected')
+  } finally {
+    cargandoCatalogos.value = false
+  }
+}
 
 const rol = computed(() => roleKey((user.value?.['tppr_id'] as number | undefined) ?? null))
 const puedeVerExpedientes = computed(() => visible('expedientes'))
@@ -93,7 +134,7 @@ async function cargarPanel() {
 
 onMounted(async () => {
   try {
-    await cargarPanel()
+    await Promise.all([cargarPanel(), cargarCatalogosInstitucionales()])
   } finally {
     loading.value = false
   }
@@ -262,6 +303,37 @@ const revisionData = computed(() =>
       </div>
     </div>
 
+    <!-- Información disponible en PostgreSQL real, distinta de los datos operativos. -->
+    <section class="card datos-institucionales" aria-label="Información institucional disponible">
+      <div class="card-head">
+        <h2>Información institucional en Render</h2>
+        <p>Catálogos y unidades consultados directamente en la API UZDI/SNAI. No son registros de adolescentes ni expedientes.</p>
+      </div>
+      <div class="card-body">
+        <p v-if="cargandoCatalogos" role="status">Cargando información institucional…</p>
+        <div v-else-if="catalogosInstitucionales.length" class="catalogo-grid">
+          <div v-for="catalogo in catalogosInstitucionales" :key="catalogo.nombre" class="catalogo-celda">
+            <span class="catalogo-numero">{{ catalogo.registros.length }}</span>
+            <span class="catalogo-etiqueta">{{ catalogo.nombre }}</span>
+            <details v-if="catalogo.registros.length">
+              <summary>Ver registros</summary>
+              <ul>
+                <li v-for="(item, indice) in catalogo.registros" :key="indice">{{ item }}</li>
+              </ul>
+            </details>
+            <span v-else class="catalogo-vacio">Sin valores registrados</span>
+          </div>
+        </div>
+        <p v-else class="catalogo-vacio">No se pudo recuperar información institucional del servidor.</p>
+        <p v-if="errorCatalogos" class="catalogo-advertencia" role="alert">
+          Algunos catálogos no se pudieron consultar con los permisos de esta sesión.
+        </p>
+        <p v-if="!errorCarga && !cargandoCatalogos && totalAdolescentes === 0 && totalExpedientes === 0" class="catalogo-nota">
+          La API no devuelve actualmente adolescentes ni expedientes. Los catálogos anteriores son información real disponible y no sustituyen esos registros.
+        </p>
+      </div>
+    </section>
+
     <div v-if="ultimoEvento" class="card" style="margin-bottom:16px;">
       <div class="card-body" style="font-size:13.5px;color:var(--color-text-secondary);">
         <b>Último evento de bitácora:</b> {{ ultimoEvento.tipo }} · {{ ultimoEvento.detalle }}
@@ -305,3 +377,20 @@ const revisionData = computed(() =>
     </template>
   </template>
 </template>
+
+<style scoped>
+.datos-institucionales { margin-bottom: 16px; }
+.datos-institucionales .card-head h2 { margin: 0 0 5px; font-size: 17px; }
+.datos-institucionales .card-head p { margin: 0; font-size: 13px; color: var(--color-text-secondary); line-height: 1.45; }
+.catalogo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 12px; }
+.catalogo-celda { display: flex; flex-direction: column; gap: 7px; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); min-width: 0; }
+.catalogo-numero { font-size: 28px; font-weight: 800; color: var(--color-brand-blue); }
+.catalogo-etiqueta { font-size: 13px; font-weight: 600; color: var(--color-text-primary); }
+.catalogo-celda details { font-size: 12px; color: var(--color-text-secondary); }
+.catalogo-celda summary { cursor: pointer; color: var(--color-brand-blue); font-weight: 600; }
+.catalogo-celda ul { max-height: 160px; overflow: auto; padding-left: 18px; margin: 8px 0 0; }
+.catalogo-celda li { padding: 2px 0; }
+.catalogo-vacio { font-size: 12px; color: var(--color-text-muted); }
+.catalogo-advertencia, .catalogo-nota { font-size: 12px; line-height: 1.55; margin: 14px 0 0; color: var(--color-text-secondary); }
+.catalogo-advertencia { color: var(--color-error); }
+</style>
