@@ -23,6 +23,21 @@ const medidas = ref<MedidaItem[]>([])
 const catalogosConError = ref<string[]>([])
 let cargado = false
 
+/** Limpiar referencias compartidas entre sesiones para evitar datos obsoletos. */
+export function limpiarCatalogos(): void {
+  nacionalidades.value = []
+  estadosCiviles.value = []
+  etnias.value = []
+  gdos.value = []
+  cantones.value = []
+  provincias.value = []
+  uzdis.value = []
+  infracciones.value = []
+  medidas.value = []
+  catalogosConError.value = []
+  cargado = false
+}
+
 export function useCatalogos() {
   async function cargarCatalogos(force = false) {
     if (cargado && !force) return
